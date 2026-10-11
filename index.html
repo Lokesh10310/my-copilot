@@ -1,312 +1,558 @@
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <meta charset="UTF-8">
+  <meta name="viewport"
+        content="width=device-width, initial-scale=1, maximum-scale=1">
+  <meta name="theme-color" content="#060913">
   <title>Parakeet Engine Pro</title>
+
   <style>
-    * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+    * { box-sizing: border-box; }
+
     body {
+      margin: 0;
+      padding: 14px;
       background: #060913;
       color: #f1f5f9;
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, monospace;
-      margin: 0;
-      padding: 12px;
+      font-family: system-ui, Arial, sans-serif;
     }
-    .top-bar {
+
+    .top {
       display: flex;
       justify-content: space-between;
       align-items: center;
-      padding-bottom: 8px;
-      border-bottom: 1px solid #1e293b;
-      margin-bottom: 8px;
+      gap: 8px;
+      padding-bottom: 12px;
+      border-bottom: 1px solid #263247;
+      margin-bottom: 14px;
     }
-    .badge {
-      font-size: 11px;
-      font-weight: 700;
-      padding: 3px 8px;
-      border-radius: 999px;
-      background: #1e293b;
-      color: #94a3b8;
-    }
-    .badge-green { background: #064e3b; color: #34d399; }
-    .badge-orange { background: #78350f; color: #f59e0b; }
-    
-    input {
-      width: 100%;
-      padding: 10px;
-      border-radius: 6px;
-      border: 1px solid #334155;
-      background: #0f172a;
+
+    .brand {
+      font-size: 19px;
+      font-weight: 800;
       color: #38bdf8;
-      font-size: 13px;
-      margin-bottom: 8px;
+      font-family: monospace;
     }
-    
+
+    .badge {
+      border-radius: 20px;
+      padding: 5px 10px;
+      background: #1e293b;
+      color: #cbd5e1;
+      font-size: 11px;
+      font-weight: 800;
+      white-space: nowrap;
+    }
+
+    .green { background: #064e3b; color: #6ee7b7; }
+    .orange { background: #78350f; color: #fcd34d; }
+    .red { background: #7f1d1d; color: #fecaca; }
+
+    input {
+      display: block;
+      width: 100%;
+      padding: 14px;
+      margin-bottom: 10px;
+      border: 1px solid #334155;
+      border-radius: 10px;
+      background: #0f172a;
+      color: #e2e8f0;
+      font-size: 14px;
+    }
+
+    .hint {
+      color: #94a3b8;
+      font-size: 12px;
+      line-height: 1.5;
+      margin-bottom: 12px;
+    }
+
     .controls {
       display: grid;
-      grid-template-columns: 2fr 1fr 1fr;
-      gap: 6px;
-      margin-bottom: 10px;
+      grid-template-columns: 1.5fr 1fr 0.7fr;
+      gap: 8px;
+      margin-bottom: 14px;
     }
+
     button {
-      padding: 12px 6px;
-      border: none;
-      border-radius: 6px;
-      font-weight: 700;
+      min-height: 54px;
+      padding: 10px 5px;
+      border: 0;
+      border-radius: 10px;
       font-size: 13px;
+      font-weight: 800;
       cursor: pointer;
     }
-    .btn-listen { background: #10b981; color: #022c22; }
-    .btn-listen.listening { background: #ef4444; color: #fff; }
-    .btn-mute { background: #334155; color: #f1f5f9; }
-    .btn-mute.active { background: #eab308; color: #000; }
-    .btn-clear { background: #1e293b; color: #94a3b8; }
 
-    .live-transcript {
-      font-size: 12px;
+    button:disabled { opacity: 0.55; }
+
+    #listenBtn { background: #10b981; color: #022c22; }
+    #listenBtn.active { background: #ef4444; color: white; }
+    #lockBtn { background: #334155; color: white; }
+    #lockBtn.active { background: #eab308; color: #111827; }
+    #clearBtn { background: #1e293b; color: #cbd5e1; }
+
+    .live {
+      min-height: 42px;
+      padding: 10px;
+      margin-bottom: 12px;
+      border: 1px solid #1e293b;
+      border-radius: 8px;
       color: #94a3b8;
-      min-height: 16px;
-      margin-bottom: 8px;
-      font-style: italic;
+      font-size: 13px;
+      overflow-wrap: anywhere;
     }
 
     .card {
       background: #0b1120;
-      border: 1px solid #1e293b;
+      border: 1px solid #263247;
       border-left: 4px solid #38bdf8;
-      border-radius: 6px;
-      padding: 12px;
-      margin-bottom: 10px;
+      border-radius: 10px;
+      padding: 14px;
+      margin-bottom: 12px;
     }
-    .q-line {
+
+    .question {
+      color: #94a3b8;
       font-size: 12px;
-      color: #64748b;
-      margin-bottom: 6px;
+      margin-bottom: 10px;
+      overflow-wrap: anywhere;
     }
-    .content-box {
-      font-size: 14px;
-      color: #e2e8f0;
-      line-height: 1.45;
+
+    .answer {
+      color: #f1f5f9;
+      font-size: 15px;
+      line-height: 1.6;
       white-space: pre-wrap;
+      overflow-wrap: anywhere;
+    }
+
+    .foot {
+      margin-top: 20px;
+      color: #64748b;
+      font-size: 11px;
+      line-height: 1.5;
     }
   </style>
 </head>
-<body>
 
-  <div class="top-bar">
-    <div style="font-weight: 800; font-size: 14px; color: #38bdf8;">PARAKEET ENGINE</div>
+<body>
+  <div class="top">
+    <div class="brand">PARAKEET ENGINE</div>
     <span id="status" class="badge">STANDBY</span>
   </div>
 
-  <input type="password" id="geminiKey" placeholder="Paste Gemini API Key (AIzaSy...)" />
+  <input
+    id="apiKey"
+    type="password"
+    placeholder="Paste Gemini API key"
+    autocomplete="off"
+    autocapitalize="off"
+    spellcheck="false"
+  >
 
-  <div class="controls">
-    <button id="listenBtn" class="btn-listen" onclick="toggleListening()">Start Mic</button>
-    <button id="muteBtn" class="btn-mute" onclick="toggleSpeechBlock()">Block Self</button>
-    <button class="btn-clear" onclick="clearFeed()">Clear</button>
+  <div class="hint">
+    Your API key is not saved by this page. Do not paste it into
+    the HTML source or commit it to GitHub.
   </div>
 
-  <div id="live" class="live-transcript">Waiting for interviewer audio...</div>
+  <div class="controls">
+    <button id="listenBtn" onclick="toggleListening()">Start Mic</button>
+    <button id="lockBtn" onclick="toggleLock()">Block Speech</button>
+    <button id="clearBtn" onclick="clearFeed()">Clear</button>
+  </div>
+
+  <div id="live" class="live">Waiting for speech...</div>
   <div id="feed"></div>
 
-  <script>
-    let recognition;
-    let isListening = false;
-    let isSpeakingAnswer = false;
-    let wakeLock = null;
+  <div class="foot">
+    Requires a supported browser with microphone permission and
+    internet access. API use may incur charges or be subject to quotas.
+  </div>
 
-    async function keepAwake() {
-      try {
-        if ('wakeLock' in navigator) wakeLock = await navigator.wakeLock.request('screen');
-      } catch (e) {}
-    }
+<script>
+"use strict";
 
-    function initSpeech() {
-      const SpeechApi = window.SpeechRecognition || window.webkitSpeechRecognition;
-      if (!SpeechApi) {
-        alert("Microphone not supported. Please use Google Chrome.");
-        return null;
-      }
-      const rec = new SpeechApi();
-      rec.continuous = true;
-      rec.interimResults = true;
-      rec.lang = 'en-IN';
+let recognition = null;
+let isListening = false;
+let isLocked = false;
+let isProcessing = false;
+let wakeLock = null;
+let lastQuestion = "";
+let lastQuestionAt = 0;
 
-      rec.onresult = (evt) => {
-        if (isSpeakingAnswer) return;
+const $ = id => document.getElementById(id);
 
-        let interim = '';
-        let finalTxt = '';
+function setStatus(text, type = "") {
+  $("status").textContent = text;
+  $("status").className = "badge " + type;
+}
 
-        for (let i = evt.resultIndex; i < evt.results.length; ++i) {
-          if (evt.results[i].isFinal) {
-            finalTxt += evt.results[i][0].transcript;
-          } else {
-            interim += evt.results[i][0].transcript;
-          }
-        }
+function setLive(text) {
+  $("live").textContent = text;
+}
 
-        if (interim) {
-          document.getElementById('live').innerText = 'Hearing: ' + interim;
-        }
+function createCard(question) {
+  const card = document.createElement("div");
+  card.className = "card";
 
-        if (finalTxt.trim().length > 10) {
-          document.getElementById('live').innerText = '';
-          dispatchAI(finalTxt.trim());
-        }
-      };
+  const q = document.createElement("div");
+  q.className = "question";
+  q.textContent = "Q: " + question;
 
-      rec.onend = () => {
-        if (isListening) rec.start();
-      };
+  const answer = document.createElement("div");
+  answer.className = "answer";
+  answer.textContent = "Generating answer...";
 
-      return rec;
-    }
+  card.append(q, answer);
+  $("feed").prepend(card);
 
-    function setStatus(badgeClass, text) {
-      const el = document.getElementById('status');
-      el.className = 'badge ' + badgeClass;
-      el.innerText = text;
-    }
+  return answer;
+}
 
-    async function toggleListening() {
-      const key = document.getElementById('geminiKey').value.trim();
-      if (!key) return alert("Please paste your Gemini API key (AIzaSy...) first.");
-      localStorage.setItem('gemini_saved_key', key);
+function initSpeech() {
+  const SpeechAPI =
+    window.SpeechRecognition ||
+    window.webkitSpeechRecognition;
 
-      if (!recognition) recognition = initSpeech();
-      const btn = document.getElementById('listenBtn');
+  if (!SpeechAPI) {
+    alert("Speech recognition is not supported in this browser. Try Chrome.");
+    return null;
+  }
 
-      if (!isListening) {
-        recognition.start();
-        isListening = true;
-        btn.innerText = "Stop Mic";
-        btn.classList.add("listening");
-        setStatus("badge-green", "LISTENING");
-        await keepAwake();
+  const rec = new SpeechAPI();
+  rec.continuous = true;
+  rec.interimResults = true;
+  rec.lang = "en-IN";
+
+  rec.onresult = event => {
+    if (isLocked || isProcessing) return;
+
+    let interim = "";
+    let finalText = "";
+
+    for (let i = event.resultIndex; i < event.results.length; i++) {
+      const result = event.results[i];
+      const text = result[0].transcript;
+
+      if (result.isFinal) {
+        finalText += text + " ";
       } else {
-        recognition.stop();
-        isListening = false;
-        btn.innerText = "Start Mic";
-        btn.classList.remove("listening");
-        setStatus("", "STANDBY");
+        interim += text;
       }
     }
 
-    function toggleSpeechBlock() {
-      isSpeakingAnswer = !isSpeakingAnswer;
-      const btn = document.getElementById('muteBtn');
-      if (isSpeakingAnswer) {
-        btn.classList.add('active');
-        btn.innerText = "Speaking (Locked)";
-      } else {
-        btn.classList.remove('active');
-        btn.innerText = "Block Self";
-      }
+    if (interim.trim()) {
+      setLive("Hearing: " + interim.trim());
     }
 
-    async function dispatchAI(question) {
-      setStatus("badge-orange", "STREAMING...");
-      
-      // Auto-lock mic for 8 seconds so your spoken answer is not re-transcribed
-      isSpeakingAnswer = true;
-      document.getElementById('muteBtn').classList.add('active');
-      document.getElementById('muteBtn').innerText = "Speaking (Locked)";
+    const question = finalText.trim();
 
-      const key = document.getElementById('geminiKey').value.trim();
-      const feed = document.getElementById('feed');
+    // Short questions such as "Define ETL" are allowed.
+    if (question.length >= 4) {
+      setLive("Processing recognized speech...");
+      dispatchAI(question);
+    }
+  };
 
-      const card = document.createElement('div');
-      card.className = 'card';
-      card.innerHTML = `<div class="q-line">Q: "${question}"</div><div class="content-box">⚡ Instant Response...</div>`;
-      feed.prepend(card);
-      const contentEl = card.querySelector('.content-box');
+  rec.onerror = event => {
+    if (event.error === "not-allowed" ||
+        event.error === "service-not-allowed") {
+      isListening = false;
+      updateMicButton();
+      setStatus("MIC DENIED", "red");
+      setLive("Allow microphone access in your browser settings.");
+    } else if (event.error !== "no-speech" &&
+               event.error !== "aborted") {
+      setLive("Microphone error: " + event.error);
+    }
+  };
 
-      const systemPrompt = `You are a real-time technical interview copilot for a Senior ETL & Data Engineer (Snowflake, SQL, dbt, Informatica PowerCenter, AWS).
-RULES:
-1. If asked for SQL/code (e.g., duplicates, window functions, joins, SCD), OUTPUT THE EXACT SQL CODE FIRST, followed by 2 bullet points on trade-offs.
-2. If conceptual, provide 1 direct sentence verdict, followed by 3 concise bullet points.
-3. Keep the entire response under 60 words. Zero pleasantries or conversational filler. Immediate actionable answers only.`;
-
-      // Models to try in order: stable 2.5-flash first, then lite fallback
-      const models = ["gemini-2.5-flash", "gemini-2.5-flash-lite"];
-      let completed = false;
-
-      for (const modelName of models) {
-        if (completed) break;
+  rec.onend = () => {
+    if (isListening) {
+      // Give Chrome time to finish its previous recognition session.
+      setTimeout(() => {
+        if (!isListening) return;
         try {
-          const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:streamGenerateContent?alt=sse&key=${key}`;
-          const res = await fetch(url, {
+          rec.start();
+        } catch (error) {
+          // A recognition session may already be active.
+        }
+      }, 200);
+    }
+  };
+
+  return rec;
+}
+
+function updateMicButton() {
+  const btn = $("listenBtn");
+  btn.textContent = isListening ? "Stop Mic" : "Start Mic";
+  btn.classList.toggle("active", isListening);
+}
+
+function updateLockButton() {
+  const btn = $("lockBtn");
+  btn.textContent = isLocked ? "Speech Blocked" : "Block Speech";
+  btn.classList.toggle("active", isLocked);
+}
+
+async function keepAwake() {
+  try {
+    if ("wakeLock" in navigator) {
+      wakeLock = await navigator.wakeLock.request("screen");
+    }
+  } catch (error) {
+    // Wake lock is optional.
+  }
+}
+
+async function toggleListening() {
+  if (isListening) {
+    isListening = false;
+
+    if (recognition) {
+      try { recognition.stop(); } catch (error) {}
+    }
+
+    if (wakeLock) {
+      try { await wakeLock.release(); } catch (error) {}
+      wakeLock = null;
+    }
+
+    updateMicButton();
+    setStatus("STANDBY");
+    setLive("Microphone stopped.");
+    return;
+  }
+
+  if (!$("apiKey").value.trim()) {
+    alert("Paste your Gemini API key first.");
+    $("apiKey").focus();
+    return;
+  }
+
+  if (!recognition) {
+    recognition = initSpeech();
+  }
+
+  if (!recognition) return;
+
+  try {
+    recognition.start();
+    isListening = true;
+    updateMicButton();
+    setStatus("LISTENING", "green");
+    setLive("Listening for speech...");
+    await keepAwake();
+  } catch (error) {
+    setStatus("MIC ERROR", "red");
+    setLive("Could not start microphone. Try again.");
+  }
+}
+
+function toggleLock() {
+  isLocked = !isLocked;
+  updateLockButton();
+  setLive(isLocked
+    ? "Speech recognition paused. Tap Block Speech to resume."
+    : "Speech recognition resumed.");
+}
+
+function clearFeed() {
+  $("feed").replaceChildren();
+  setLive("Feed cleared.");
+}
+
+async function dispatchAI(question) {
+  question = question.trim();
+  if (!question || isProcessing) return;
+
+  // Avoid accidentally submitting the same transcript twice.
+  const now = Date.now();
+  if (question === lastQuestion && now - lastQuestionAt < 4000) {
+    return;
+  }
+  lastQuestion = question;
+  lastQuestionAt = now;
+
+  const key = $("apiKey").value.trim();
+  if (!key) {
+    setStatus("NO API KEY", "red");
+    return;
+  }
+
+  isProcessing = true;
+  setStatus("THINKING", "orange");
+  const output = createCard(question);
+  let succeeded = false;
+  let lastError = "No response received.";
+
+  const systemPrompt = `
+You are a concise technical study and interview-practice assistant
+for ETL and Data Engineering.
+
+Topics: Informatica PowerCenter, SQL, PostgreSQL, Redshift,
+Snowflake, dbt, AWS, data warehousing and ETL troubleshooting.
+
+Instructions:
+- For SQL questions, show the SQL first, then at most two short notes.
+- For conceptual questions, give a direct definition and three concise bullets.
+- Keep the answer under 60 words unless code requires more.
+- Use technically accurate, clear language.
+- No greetings, introductions or filler.
+- If the question is unclear, briefly state the assumption.
+`;
+
+  // Current model IDs listed in Google's model documentation.
+  const models = [
+    "gemini-3.5-flash-lite",
+    "gemini-3.8-flash"
+  ];
+
+  try {
+    for (const model of models) {
+      let response;
+
+      try {
+        response = await fetch(
+          "https://generativelanguage.googleapis.com/v1beta/models/" +
+          model + ":streamGenerateContent?alt=sse",
+          {
             method: "POST",
-            headers: { "Content-Type": "application/json" },
+            headers: {
+              "Content-Type": "application/json",
+              "x-goog-api-key": key
+            },
             body: JSON.stringify({
-              system_instruction: { parts: [{ text: systemPrompt }] },
-              contents: [{ parts: [{ text: question }] }],
+              systemInstruction: {
+                parts: [{ text: systemPrompt }]
+              },
+              contents: [{
+                role: "user",
+                parts: [{ text: question }]
+              }],
               generationConfig: {
                 temperature: 0.1,
-                maxOutputTokens: 250
+                maxOutputTokens: 180
               }
             })
-          });
-
-          if (!res.ok) {
-            const errData = await res.json().catch(() => ({}));
-            const errMsg = errData.error?.message || `HTTP ${res.status}`;
-            contentEl.innerText = `Error (${modelName}): ${errMsg}`;
-            continue;
           }
-
-          contentEl.innerText = "";
-          const reader = res.body.getReader();
-          const decoder = new TextDecoder();
-          let buffer = "";
-
-          while (true) {
-            const { done, value } = await reader.read();
-            if (done) break;
-            buffer += decoder.decode(value, { stream: true });
-            
-            const lines = buffer.split("\n");
-            buffer = lines.pop();
-
-            for (const line of lines) {
-              const cleanLine = line.trim();
-              if (cleanLine.startsWith("data: ")) {
-                try {
-                  const json = JSON.parse(cleanLine.substring(6));
-                  const chunk = json.candidates?.[0]?.content?.parts?.[0]?.text || "";
-                  contentEl.innerText += chunk;
-                } catch (e) {}
-              }
-            }
-          }
-          completed = true;
-          break;
-        } catch (err) {
-          contentEl.innerText = "Connection Error: " + err.message;
-        }
+        );
+      } catch (error) {
+        lastError = "Network error: " + error.message;
+        continue;
       }
 
-      setStatus("badge-green", "LISTENING");
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        lastError =
+          errorData.error?.message ||
+          ("HTTP " + response.status + " for " + model);
 
-      // Auto-unlock mic after 8 seconds
-      setTimeout(() => {
-        isSpeakingAnswer = false;
-        document.getElementById('muteBtn').classList.remove('active');
-        document.getElementById('muteBtn').innerText = "Block Self";
-      }, 8000);
+        // These usually require correcting credentials or the request.
+        if ([400, 401, 403].includes(response.status)) {
+          break;
+        }
+
+        // Try the fallback for unavailable models or server/quota errors.
+        continue;
+      }
+
+      if (!response.body) {
+        lastError = "Streaming is unavailable in this browser.";
+        continue;
+      }
+
+      let answer = "";
+      let buffer = "";
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+
+      try {
+        while (true) {
+          const result = await reader.read();
+          buffer += decoder.decode(
+            result.value || new Uint8Array(),
+            { stream: !result.done }
+          );
+
+          const lines = buffer.split(/\r?\n/);
+          buffer = lines.pop() || "";
+
+          for (const line of lines) {
+            const clean = line.trim();
+
+            if (!clean.startsWith("data:")) continue;
+
+            const payload = clean.slice(5).trim();
+            if (!payload || payload === "[DONE]") continue;
+
+            try {
+              const data = JSON.parse(payload);
+              const parts =
+                data.candidates?.[0]?.content?.parts || [];
+
+              for (const part of parts) {
+                if (typeof part.text === "string") {
+                  answer += part.text;
+                }
+              }
+
+              if (answer) output.textContent = answer;
+            } catch (error) {
+              // Ignore incomplete or non-JSON event lines.
+            }
+          }
+
+          if (result.done) break;
+        }
+      } finally {
+        reader.releaseLock();
+      }
+
+      if (!answer.trim()) {
+        lastError = "The model returned an empty answer.";
+        continue;
+      }
+
+      succeeded = true;
+      break;
     }
 
-    function clearFeed() {
-      document.getElementById('feed').innerHTML = '';
-      document.getElementById('live').innerText = '';
+    if (!succeeded) {
+      output.textContent =
+        "Request failed: " + lastError +
+        "\n\nCheck your model access, API key, quota and network connection.";
+      setStatus("REQUEST FAILED", "red");
+    } else {
+      setStatus("ANSWER READY", "green");
     }
+  } catch (error) {
+    output.textContent = "Error: " + (error.message || String(error));
+    setStatus("ERROR", "red");
+  } finally {
+    isProcessing = false;
 
-    window.onload = () => {
-      const saved = localStorage.getItem('gemini_saved_key');
-      if (saved) document.getElementById('geminiKey').value = saved;
-    };
-  </script>
+    if (isListening) {
+      setStatus("LISTENING", "green");
+      setLive(isLocked
+        ? "Speech recognition blocked."
+        : "Ready for the next question.");
+    } else if (succeeded) {
+      setStatus("STANDBY");
+    }
+  }
+}
+
+// Release the screen wake lock when the page is hidden.
+document.addEventListener("visibilitychange", async () => {
+  if (document.visibilityState === "visible" && isListening) {
+    await keepAwake();
+  }
+});
+</script>
 </body>
 </html>
