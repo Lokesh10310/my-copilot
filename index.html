@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-  <title>Parakeet Engine Mobile</title>
+  <title>Parakeet Engine Pro</title>
   <style>
     * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
     body {
@@ -31,7 +31,6 @@
     }
     .badge-green { background: #064e3b; color: #34d399; }
     .badge-orange { background: #78350f; color: #f59e0b; }
-    .badge-red { background: #7f1d1d; color: #f87171; }
     
     input {
       width: 100%;
@@ -91,30 +90,16 @@
       line-height: 1.45;
       white-space: pre-wrap;
     }
-    pre {
-      background: #020617;
-      border: 1px solid #334155;
-      padding: 8px;
-      border-radius: 4px;
-      color: #38bdf8;
-      font-size: 12.5px;
-      overflow-x: auto;
-      margin: 6px 0;
-    }
-    .bullet {
-      color: #38bdf8;
-      font-weight: 700;
-    }
   </style>
 </head>
 <body>
 
   <div class="top-bar">
-    <div style="font-weight: 800; font-size: 14px; color: #38bdf8;">PARAKEET ENGINE</div>
+    <div style="font-weight: 800; font-size: 14px; color: #38bdf8;">PARAKEET ENGINE (GROQ)</div>
     <span id="status" class="badge">STANDBY</span>
   </div>
 
-  <input type="password" id="apiKey" placeholder="Paste Gemini API Key (AIzaSy...)" />
+  <input type="password" id="groqKey" placeholder="Paste Groq API Key (gsk_...)" />
 
   <div class="controls">
     <button id="listenBtn" class="btn-listen" onclick="toggleListening()">Start Mic</button>
@@ -128,15 +113,8 @@
   <script>
     let recognition;
     let isListening = false;
-    let isSpeakingAnswer = false; // Prevents recording yourself
+    let isSpeakingAnswer = false;
     let wakeLock = null;
-
-    // Ordered list of models to fall back through instantly if 503 occurs
-    const MODELS = [
-      "gemini-2.5-flash-lite",
-      "gemini-2.5-flash",
-      "gemini-3.8-flash"
-    ];
 
     async function keepAwake() {
       try {
@@ -147,16 +125,16 @@
     function initSpeech() {
       const SpeechApi = window.SpeechRecognition || window.webkitSpeechRecognition;
       if (!SpeechApi) {
-        alert("Browser does not support Web Speech. Please use Google Chrome.");
+        alert("Microphone not supported. Please use Google Chrome.");
         return null;
       }
       const rec = new SpeechApi();
       rec.continuous = true;
       rec.interimResults = true;
-      rec.lang = 'en-IN'; // Tuned for Indian English accents
+      rec.lang = 'en-IN'; // Indian English accent tuning
 
       rec.onresult = (evt) => {
-        if (isSpeakingAnswer) return; // Drop audio while candidate speaks
+        if (isSpeakingAnswer) return; // Ignore your own audio while speaking
 
         let interim = '';
         let finalTxt = '';
@@ -170,10 +148,9 @@
         }
 
         if (interim) {
-          document.getElementById('live').innerText = 'Interviewer: ' + interim;
+          document.getElementById('live').innerText = 'Hearing: ' + interim;
         }
 
-        // Trigger only on complete sentence
         if (finalTxt.trim().length > 10) {
           document.getElementById('live').innerText = '';
           dispatchAI(finalTxt.trim());
@@ -194,9 +171,9 @@
     }
 
     async function toggleListening() {
-      const key = document.getElementById('apiKey').value.trim();
-      if (!key) return alert("Paste your Gemini API key first.");
-      localStorage.setItem('gemini_key', key);
+      const key = document.getElementById('groqKey').value.trim();
+      if (!key) return alert("Please paste your Groq API key (gsk_...) first.");
+      localStorage.setItem('groq_saved_key', key);
 
       if (!recognition) recognition = initSpeech();
       const btn = document.getElementById('listenBtn');
@@ -217,7 +194,6 @@
       }
     }
 
-    // Toggle to prevent recording your own voice when you answer
     function toggleSpeechBlock() {
       isSpeakingAnswer = !isSpeakingAnswer;
       const btn = document.getElementById('muteBtn');
@@ -233,12 +209,12 @@
     async function dispatchAI(question) {
       setStatus("badge-orange", "STREAMING...");
       
-      // Auto-lock for 6 seconds to avoid self-echoing
+      // Auto-lock mic for 8 seconds so your answer is not recorded as a question
       isSpeakingAnswer = true;
       document.getElementById('muteBtn').classList.add('active');
       document.getElementById('muteBtn').innerText = "Speaking (Locked)";
 
-      const key = document.getElementById('apiKey').value.trim();
+      const key = document.getElementById('groqKey').value.trim();
       const feed = document.getElementById('feed');
 
       const card = document.createElement('div');
@@ -247,73 +223,69 @@
       feed.prepend(card);
       const contentEl = card.querySelector('.content-box');
 
-      const systemPrompt = `You are a real-time copilot for an ETL/Data Engineer (Snowflake, SQL, dbt, Informatica).
+      const systemPrompt = `You are a silent real-time interview co-pilot for a Senior Data Engineer & ETL Developer (Snowflake, SQL, dbt, Informatica PowerCenter, AWS).
 RULES:
-1. IF the question asks for SQL/Code (e.g. find duplicates, join, merge, window function), output the exact query in SQL code first, then 2 bullet points on why it works.
-2. IF conceptual, answer in 1 sharp verdict sentence followed by 3 concise bullet points.
-3. Keep the entire response under 60 words. No intro ("Sure!"), no outro. Immediate actionable syntax and facts.`;
+1. If the question asks to write SQL/code (e.g., duplicates, window functions, joins), OUTPUT THE EXACT SQL CODE BLOCK FIRST, followed by 2 bullet points on trade-offs.
+2. If conceptual, provide 1 direct sentence verdict, followed by 3 high-impact bullet points.
+3. Keep the total response under 60 words. Zero pleasantries or introductions. Jump straight to the solution.`;
 
-      let success = false;
+      try {
+        const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+          method: "POST",
+          headers: {
+            "Authorization": "Bearer " + key,
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify({
+            model: "llama-3.3-70b-versatile",
+            stream: true,
+            temperature: 0.1,
+            max_tokens: 250,
+            messages: [
+              { role: "system", content: systemPrompt },
+              { role: "user", content: question }
+            ]
+          })
+        });
 
-      // Waterfall fallback: tries lite first (never gets 503), then flash
-      for (const model of MODELS) {
-        if (success) break;
-        try {
-          const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:streamGenerateContent?alt=sse&key=${key}`;
-          const res = await fetch(url, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              system_instruction: { parts: [{ text: systemPrompt }] },
-              contents: [{ parts: [{ text: question }] }],
-              generationConfig: {
-                temperature: 0.0,
-                maxOutputTokens: 250
-              }
-            })
-          });
+        if (!res.ok) {
+          const errData = await res.json();
+          contentEl.innerText = `API Error (${res.status}): ${errData.error?.message || 'Check key'}`;
+          setStatus("badge-green", "LISTENING");
+          return;
+        }
 
-          if (res.status === 503 || !res.ok) {
-            continue; // Fail over immediately to next model in array
-          }
+        contentEl.innerText = "";
+        const reader = res.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = "";
 
-          contentEl.innerText = "";
-          const reader = res.body.getReader();
-          const decoder = new TextDecoder();
-          let buffer = "";
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          buffer += decoder.decode(value, { stream: true });
+          
+          const lines = buffer.split("\n");
+          buffer = lines.pop();
 
-          while (true) {
-            const { done, value } = await reader.read();
-            if (done) break;
-            buffer += decoder.decode(value, { stream: true });
-            
-            const lines = buffer.split("\n");
-            buffer = lines.pop(); // keep last incomplete line
-
-            for (const line of lines) {
-              if (line.startsWith("data: ")) {
-                try {
-                  const json = JSON.parse(line.substring(6));
-                  const chunk = json.candidates?.[0]?.content?.parts?.[0]?.text || "";
-                  contentEl.innerText += chunk;
-                } catch (e) {}
-              }
+          for (const line of lines) {
+            const cleanLine = line.trim();
+            if (cleanLine.startsWith("data: ") && cleanLine !== "data: [DONE]") {
+              try {
+                const parsed = JSON.parse(cleanLine.substring(6));
+                const delta = parsed.choices?.[0]?.delta?.content || "";
+                contentEl.innerText += delta;
+              } catch (e) {}
             }
           }
-          success = true;
-          break;
-        } catch (e) {
-          // Move to next model
         }
-      }
-
-      if (!success) {
-        contentEl.innerText = "All endpoints busy. Repeat query or tap mic.";
+      } catch (err) {
+        contentEl.innerText = "Network Error: " + err.message;
       }
 
       setStatus("badge-green", "LISTENING");
 
-      // Release self-speech lock after 8 seconds
+      // Auto-unlock mic after 8 seconds
       setTimeout(() => {
         isSpeakingAnswer = false;
         document.getElementById('muteBtn').classList.remove('active');
@@ -327,8 +299,8 @@ RULES:
     }
 
     window.onload = () => {
-      const saved = localStorage.getItem('gemini_key');
-      if (saved) document.getElementById('apiKey').value = saved;
+      const saved = localStorage.getItem('groq_saved_key');
+      if (saved) document.getElementById('groqKey').value = saved;
     };
   </script>
 </body>
