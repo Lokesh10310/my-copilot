@@ -256,8 +256,7 @@
   <div id="feed"></div>
 
   <div class="foot">
-    Speech is submitted after a short pause, and answer generation starts early.
-    If you keep talking, the early attempt is cancelled and restarted with the full question.
+    Fast mode: complete-looking questions submit after a short pause. If more words arrive before the first answer text appears, that attempt is cancelled and restarted with the updated question. Timing is shown on each answer card.
   </div>
 </div>
 
@@ -267,16 +266,22 @@
 /* =========================================================================
    CONFIG
    ========================================================================= */
-const MODELS = ["gemini-3.5-flash-lite", "gemini-3.8-flash"];
-const FIRST_TOKEN_TIMEOUT_MS = 4500;   // give up on a model that is silent this long
-const MAX_OUTPUT_TOKENS = 600;         // thinking tokens count too, so keep headroom
-const HISTORY_TURNS = 3;               // previous Q&A pairs sent for follow-up questions
+const MODELS = [
+  // Fast, low-cost default. Gemini 3.5 Flash-Lite supports minimal thinking.
+  { id: "gemini-3.5-flash-lite", thinkingLevel: "minimal" },
+  // Fallback for harder questions. Gemini 3.8 Flash supports low/medium/high,
+  // not minimal; configure it directly so we do not waste a failed request.
+  { id: "gemini-3.8-flash", thinkingLevel: "low" }
+];
+const FIRST_TOKEN_TIMEOUT_MS = 3200;   // move to fallback sooner if the first model stalls
+const MAX_OUTPUT_TOKENS = 420;         // enough for short answers and most code questions
+const HISTORY_TURNS = 2;               // smaller context = less input work; enough for follow-ups
 
 // Silence (ms) after your last word before the answer starts generating.
 // Complete-looking questions start early; unfinished ones wait longer.
-const PAUSE = { complete: 600, normal: 950, dangling: 1600, incomplete: 2200 };
+const PAUSE = { complete: 420, normal: 760, dangling: 1250, incomplete: 1850 };
 // Used when the speech engine itself reports "end of turn" (Deepgram).
-const END_OF_TURN = { complete: 250, normal: 550 };
+const END_OF_TURN = { complete: 200, normal: 420 };
 const STALE_MS = 15000;
 
 // Echo filter: ignore YOU reading the answer aloud.
@@ -674,21 +679,27 @@ function buildSystemPrompt() {
     ? "Use simple, natural spoken English."
     : "Be technically precise.";
 
-  return `You are a live interview copilot. The candidate reads your answer aloud to an interviewer within seconds.
+  return `You are a real-time technical interview answer assistant. The answer must be fast to read and technically correct.
 
-CANDIDATE CONTEXT (use it for experience and behavioural questions; never invent employers, dates or numbers that are not here, use [brackets] for missing details):
+CANDIDATE CONTEXT (use for experience and behavioural questions; never invent employers, dates, project details, or metrics. Use [brackets] for missing details):
 ${context}
 
-INPUT: the question comes from speech-to-text and may contain mishearings of technical terms ("information of our centre" means "Informatica PowerCenter", "red shift" means Redshift). Silently correct them to the most likely technical term. If it is a follow-up such as "give an example" or "why?", use the previous turns.
+INPUT: Speech-to-text may mishear technical terms. Correct likely terms silently (for example, "information of our centre" may mean "Informatica PowerCenter" and "red shift" means Redshift). For follow-ups such as "why?" or "give an example", use recent conversation context.
+
+ACCURACY RULES:
+- Answer the exact question; do not guess details that are not known.
+- For SQL, give syntactically valid SQL for the database named in the question. If no database is named, prefer PostgreSQL-compatible SQL and state an important dialect assumption briefly if needed.
+- For Informatica, distinguish PowerCenter-specific behaviour from general ETL concepts.
+- For behavioural/project questions, use only candidate context and do not fabricate personal experience.
 
 FORMAT:
-- Line 1: one direct sentence that answers the question and can be spoken on its own.
-- Then at most 3 short bullets starting with "- ": key points, plus one concrete example or number.
-- SQL or code questions: runnable code first, then at most 2 short notes.
-- About ${words} words in total unless code needs more.
-- Plain text only: no markdown, no ** or #, no greeting, no filler, never restate the question.
+- Start immediately with one direct answer sentence.
+- Then at most 3 short bullets beginning with "- ". Include a concrete example only when useful.
+- For SQL/code questions, put runnable code first, then at most 2 short notes.
+- Aim for about ${words} words unless code requires more.
+- Plain text only; no markdown headings, bold markers, greetings, filler, or restating the question.
 - ${tone}
-- If the input is not a question or request (small talk, filler, a statement, noise), output exactly [skip] and nothing else.`;
+- If the input is clearly small talk, filler, a statement, or noise rather than a question/request, output exactly [skip].`;
 }
 
 function buildContents(question) {
@@ -783,7 +794,8 @@ function onStreamText(gen, text) {
   return "ok";
 }
 
-async function streamModel(gen, key, model, systemPrompt, contents, useThinking) {
+async function streamModel(gen, key, modelConfig, systemPrompt, contents) {
+  const model = modelConfig.id;
   const attempt = new AbortController();
   const onAbort = () => attempt.abort();
   gen.controller.signal.addEventListener("abort", onAbort);
@@ -794,8 +806,11 @@ async function streamModel(gen, key, model, systemPrompt, contents, useThinking)
       temperature: 0.2,
       maxOutputTokens: MAX_OUTPUT_TOKENS
     };
-    // Gemini 3.x: minimal thinking = fastest first token.
-    if (useThinking) generationConfig.thinkingConfig = { thinkingLevel: "minimal" };
+    // Use a supported thinking level for each model: minimal for Flash-Lite,
+    // low for Flash. This avoids an extra 400 response/retry on the fallback.
+    if (modelConfig.thinkingLevel) {
+      generationConfig.thinkingConfig = { thinkingLevel: modelConfig.thinkingLevel };
+    }
 
     const url =
       "https://generativelanguage.googleapis.com/v1beta/models/" +
@@ -833,9 +848,6 @@ async function streamModel(gen, key, model, systemPrompt, contents, useThinking)
       const message = err.error?.message ||
         ("HTTP " + response.status + " for " + model);
 
-      if (useThinking && response.status === 400 && /think/i.test(message)) {
-        return { state: "no-thinking", error: message };
-      }
       if ([400, 401, 403].includes(response.status)) {
         return { state: "fatal", error: message };
       }
@@ -964,19 +976,16 @@ async function dispatchAI(question, heardPlain) {
   let lastError = "No response received.";
 
   search:
-  for (const model of MODELS) {
-    for (const useThinking of [true, false]) {
-      const r = await streamModel(gen, key, model, systemPrompt, contents, useThinking);
+  for (const modelConfig of MODELS) {
+    const r = await streamModel(gen, key, modelConfig, systemPrompt, contents);
 
-      if (r.state === "cancelled") return;
-      if (r.state === "skipped") { outcome = "skipped"; break search; }
-      if (r.state === "ok") { outcome = "ok"; answer = r.text; break search; }
+    if (r.state === "cancelled") return;
+    if (r.state === "skipped") { outcome = "skipped"; break search; }
+    if (r.state === "ok") { outcome = "ok"; answer = r.text; break search; }
 
-      lastError = r.error || lastError;
-      if (r.state === "no-thinking") continue;   // same model, no thinkingConfig
-      if (r.state === "fatal") break search;
-      break;                                      // try the next model
-    }
+    lastError = r.error || lastError;
+    if (r.state === "fatal") break search;
+    // Network errors, rate limits, and first-token timeouts try the next model.
   }
 
   if (gen.cancelled) return;
@@ -994,6 +1003,9 @@ async function dispatchAI(question, heardPlain) {
     rememberAnswer(answer);
     history.push({ q: question, a: answer });
     if (history.length > HISTORY_TURNS) history.shift();
+    const totalMs = Math.round(performance.now() - gen.startedAt);
+    const firstMs = gen.firstTokenAt ? Math.round(gen.firstTokenAt - gen.startedAt) : totalMs;
+    gen.card.meta.textContent = "First text: " + firstMs + " ms · Complete answer: " + totalMs + " ms after request started";
     setStatus("ANSWER READY", "green");
   } else {
     gen.card.answer.textContent =
@@ -1272,8 +1284,8 @@ function warmUp() {
   if (!key) return;
   fetch(
     "https://generativelanguage.googleapis.com/v1beta/models/" +
-      encodeURIComponent(MODELS[0]) + "?key=" + encodeURIComponent(key),
-    { method: "GET" }
+      encodeURIComponent(MODELS[0].id),
+    { method: "GET", headers: { "x-goog-api-key": key } }
   ).catch(() => {});
 }
 
