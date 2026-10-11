@@ -95,11 +95,11 @@
 <body>
 
   <div class="top-bar">
-    <div style="font-weight: 800; font-size: 14px; color: #38bdf8;">PARAKEET ENGINE (GROQ)</div>
+    <div style="font-weight: 800; font-size: 14px; color: #38bdf8;">PARAKEET ENGINE</div>
     <span id="status" class="badge">STANDBY</span>
   </div>
 
-  <input type="password" id="groqKey" placeholder="Paste Groq API Key (gsk_...)" />
+  <input type="password" id="geminiKey" placeholder="Paste Gemini API Key (AIzaSy...)" />
 
   <div class="controls">
     <button id="listenBtn" class="btn-listen" onclick="toggleListening()">Start Mic</button>
@@ -116,12 +116,6 @@
     let isSpeakingAnswer = false;
     let wakeLock = null;
 
-    // Active production models on Groq
-    const GROQ_MODELS = [
-      "llama-3.1-8b-instant",
-      "meta-llama/llama-4-scout-17b-16e-instruct"
-    ];
-
     async function keepAwake() {
       try {
         if ('wakeLock' in navigator) wakeLock = await navigator.wakeLock.request('screen');
@@ -137,7 +131,7 @@
       const rec = new SpeechApi();
       rec.continuous = true;
       rec.interimResults = true;
-      rec.lang = 'en-IN'; // Tuned for Indian English accents
+      rec.lang = 'en-IN';
 
       rec.onresult = (evt) => {
         if (isSpeakingAnswer) return;
@@ -177,9 +171,9 @@
     }
 
     async function toggleListening() {
-      const key = document.getElementById('groqKey').value.trim();
-      if (!key) return alert("Please paste your Groq API key (gsk_...) first.");
-      localStorage.setItem('groq_saved_key', key);
+      const key = document.getElementById('geminiKey').value.trim();
+      if (!key) return alert("Please paste your Gemini API key (AIzaSy...) first.");
+      localStorage.setItem('gemini_saved_key', key);
 
       if (!recognition) recognition = initSpeech();
       const btn = document.getElementById('listenBtn');
@@ -215,12 +209,12 @@
     async function dispatchAI(question) {
       setStatus("badge-orange", "STREAMING...");
       
-      // Auto-lock mic for 8 seconds so your answer is not recorded as a question
+      // Auto-lock mic for 8 seconds so your spoken answer is not re-transcribed
       isSpeakingAnswer = true;
       document.getElementById('muteBtn').classList.add('active');
       document.getElementById('muteBtn').innerText = "Speaking (Locked)";
 
-      const key = document.getElementById('groqKey').value.trim();
+      const key = document.getElementById('geminiKey').value.trim();
       const feed = document.getElementById('feed');
 
       const card = document.createElement('div');
@@ -231,34 +225,37 @@
 
       const systemPrompt = `You are a real-time technical interview copilot for a Senior ETL & Data Engineer (Snowflake, SQL, dbt, Informatica PowerCenter, AWS).
 RULES:
-1. If asked for SQL/code (e.g. duplicate rows, window functions, SCD, merge), OUTPUT THE EXACT SQL CODE BLOCK FIRST, followed by 2 bullet points on trade-offs.
+1. If asked for SQL/code (e.g., duplicates, window functions, joins, SCD), OUTPUT THE EXACT SQL CODE FIRST, followed by 2 bullet points on trade-offs.
 2. If conceptual, provide 1 direct sentence verdict, followed by 3 concise bullet points.
-3. Keep the entire response under 60 words. Zero intro or outro pleasantries. Immediate actionable answers.`;
+3. Keep the entire response under 60 words. Zero pleasantries or conversational filler. Immediate actionable answers only.`;
 
+      // Models to try in order: stable 2.5-flash first, then lite fallback
+      const models = ["gemini-2.5-flash", "gemini-2.5-flash-lite"];
       let completed = false;
 
-      for (const modelName of GROQ_MODELS) {
+      for (const modelName of models) {
         if (completed) break;
         try {
-          const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+          const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:streamGenerateContent?alt=sse&key=${key}`;
+          const res = await fetch(url, {
             method: "POST",
-            headers: {
-              "Authorization": "Bearer " + key,
-              "Content-Type": "application/json"
-            },
+            headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
-              model: modelName,
-              stream: true,
-              temperature: 0.1,
-              max_tokens: 250,
-              messages: [
-                { role: "system", content: systemPrompt },
-                { role: "user", content: question }
-              ]
+              system_instruction: { parts: [{ text: systemPrompt }] },
+              contents: [{ parts: [{ text: question }] }],
+              generationConfig: {
+                temperature: 0.1,
+                maxOutputTokens: 250
+              }
             })
           });
 
-          if (!res.ok) continue;
+          if (!res.ok) {
+            const errData = await res.json().catch(() => ({}));
+            const errMsg = errData.error?.message || `HTTP ${res.status}`;
+            contentEl.innerText = `Error (${modelName}): ${errMsg}`;
+            continue;
+          }
 
           contentEl.innerText = "";
           const reader = res.body.getReader();
@@ -275,22 +272,20 @@ RULES:
 
             for (const line of lines) {
               const cleanLine = line.trim();
-              if (cleanLine.startsWith("data: ") && cleanLine !== "data: [DONE]") {
+              if (cleanLine.startsWith("data: ")) {
                 try {
-                  const parsed = JSON.parse(cleanLine.substring(6));
-                  const delta = parsed.choices?.[0]?.delta?.content || "";
-                  contentEl.innerText += delta;
+                  const json = JSON.parse(cleanLine.substring(6));
+                  const chunk = json.candidates?.[0]?.content?.parts?.[0]?.text || "";
+                  contentEl.innerText += chunk;
                 } catch (e) {}
               }
             }
           }
           completed = true;
           break;
-        } catch (err) {}
-      }
-
-      if (!completed) {
-        contentEl.innerText = "Error: Check API key or connection.";
+        } catch (err) {
+          contentEl.innerText = "Connection Error: " + err.message;
+        }
       }
 
       setStatus("badge-green", "LISTENING");
@@ -309,8 +304,8 @@ RULES:
     }
 
     window.onload = () => {
-      const saved = localStorage.getItem('groq_saved_key');
-      if (saved) document.getElementById('groqKey').value = saved;
+      const saved = localStorage.getItem('gemini_saved_key');
+      if (saved) document.getElementById('geminiKey').value = saved;
     };
   </script>
 </body>
