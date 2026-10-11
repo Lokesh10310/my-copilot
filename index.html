@@ -88,7 +88,7 @@
     <div><span id="dot" class="status-dot"></span><span id="status-text" style="font-size: 13px; color:#94a3b8;">Idle</span></div>
   </div>
 
-  <input type="password" id="groqKey" placeholder="Paste Groq API Key (gsk_...)" />
+  <input type="password" id="geminiKey" placeholder="Paste Gemini API Key (AIzaSy...)" />
 
   <div class="btn-row">
     <button id="toggleBtn" class="btn-toggle" onclick="toggleMic()">Start Listening</button>
@@ -123,9 +123,9 @@
 
       rec.onresult = async (evt) => {
         const text = evt.results[evt.results.length - 1][0].transcript.trim();
-        if (text.length > 10) {
+        if (text.length > 5) {
           updateStatus("thinking", "Answering...");
-          await queryAI(text);
+          await queryGemini(text);
           if (listening) updateStatus("active", "Listening...");
         }
       };
@@ -145,12 +145,12 @@
     }
 
     async function toggleMic() {
-      const key = document.getElementById('groqKey').value.trim();
+      const key = document.getElementById('geminiKey').value.trim();
       if (!key) {
-        alert("Please paste your Groq API key first!");
+        alert("Please paste your Gemini API key first!");
         return;
       }
-      localStorage.setItem('groq_key', key);
+      localStorage.setItem('gemini_key', key);
 
       if (!recognition) recognition = setupSpeech();
       const btn = document.getElementById('toggleBtn');
@@ -171,40 +171,37 @@
       }
     }
 
-    async function queryAI(promptText) {
-      const key = document.getElementById('groqKey').value.trim();
+    async function queryGemini(promptText) {
+      const key = document.getElementById('geminiKey').value.trim();
       const feed = document.getElementById('feed');
       
       const card = document.createElement('div');
       card.className = 'card';
-      card.innerHTML = `<div class="q-text">Q: "${promptText}"</div><div class="a-text">...</div>`;
+      card.innerHTML = `<div class="q-text">Q: "${promptText}"</div><div class="a-text">Thinking...</div>`;
       feed.prepend(card);
       const answerBox = card.querySelector('.a-text');
 
       try {
-        const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+        const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${key}`;
+        const res = await fetch(url, {
           method: "POST",
-          headers: {
-            "Authorization": "Bearer " + key,
-            "Content-Type": "application/json"
-          },
+          headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            model: "llama-3.3-70b-versatile",
-            messages: [
-              {
-                role: "system",
-                content: "You are a real-time interview co-pilot. Listen to the interview question and provide a crisp answer: 1 direct sentence followed by 3 short bullet points. Total length under 50 words so the user can scan it instantly."
-              },
-              { role: "user", content: promptText }
-            ],
-            temperature: 0.2
+            system_instruction: {
+              parts: [{ text: "You are a real-time interview co-pilot. Listen to the question and provide a direct 1-sentence answer followed by 3 short bullet points. Keep it under 50 words total so the user can scan it instantly." }]
+            },
+            contents: [{ parts: [{ text: promptText }] }]
           })
         });
 
         const data = await res.json();
-        answerBox.innerText = data.choices[0].message.content;
+        if (!res.ok) {
+          answerBox.innerText = `Error (${res.status}): ${data.error ? data.error.message : 'Request failed'}`;
+          return;
+        }
+        answerBox.innerText = data.candidates[0].content.parts[0].text;
       } catch (err) {
-        answerBox.innerText = "Error: Check your API key or network connection.";
+        answerBox.innerText = "Network Error: " + err.message;
       }
     }
 
@@ -213,8 +210,8 @@
     }
 
     window.onload = () => {
-      const savedKey = localStorage.getItem('groq_key');
-      if (savedKey) document.getElementById('groqKey').value = savedKey;
+      const savedKey = localStorage.getItem('gemini_key');
+      if (savedKey) document.getElementById('geminiKey').value = savedKey;
     };
   </script>
 </body>
