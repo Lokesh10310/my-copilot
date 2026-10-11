@@ -89,6 +89,21 @@
     #lockBtn.active { background: #eab308; color: #111827; }
     #clearBtn { background: #1e293b; color: #cbd5e1; }
 
+    .opt {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 12px;
+      color: #94a3b8;
+      font-size: 12px;
+    }
+
+    .opt input {
+      display: inline-block;
+      width: auto;
+      margin: 0;
+    }
+
     .live {
       min-height: 42px;
       padding: 10px;
@@ -159,6 +174,11 @@
     <button id="clearBtn" onclick="clearFeed()">Clear</button>
   </div>
 
+  <label class="opt">
+    <input id="echoFilter" type="checkbox" checked>
+    Ignore my voice when I read the answer aloud
+  </label>
+
   <div id="live" class="live">
     Ready. Ask your complete interview question.
   </div>
@@ -196,6 +216,109 @@ let lastQuestion = "";
 let lastQuestionAt = 0;
 
 const SPEECH_PAUSE_MS = 1800;
+
+// ---- Echo filter: ignore YOU reading the answer aloud -------------------
+// The mic cannot tell your voice from the interviewer's, so instead we
+// compare what was heard with the answers already on screen. Reading an
+// answer produces long runs of words copied from it; a real new question
+// does not.
+const ECHO_MIN_WORDS = 5;          // from this length, ECHO_RATIO applies; 3-4 word bits must match 100%
+const ECHO_RATIO = 0.75;           // share of words copied from an answer => ignore it all
+const ECHO_RUN_WORDS = 6;          // a copied run this long is cut out of the question
+const MAX_REMEMBERED_ANSWERS = 3;  // how many recent answers to compare against
+
+let recentAnswers = [];
+let answerBigrams = new Set();
+
+function normToken(word) {
+  return word.toLowerCase().replace(/[^\p{L}\p{N}]/gu, "");
+}
+
+function answerTokens(text) {
+  return text
+    .toLowerCase()
+    .replace(/[-_/]/g, " ")
+    .split(/\s+/)
+    .map(normToken)
+    .filter(Boolean);
+}
+
+function rememberAnswer(text) {
+  const tokens = answerTokens(text);
+  if (tokens.length < 2) return;
+
+  recentAnswers.push(tokens);
+  if (recentAnswers.length > MAX_REMEMBERED_ANSWERS) recentAnswers.shift();
+
+  answerBigrams = new Set();
+  for (const words of recentAnswers) {
+    for (let i = 0; i < words.length - 1; i++) {
+      answerBigrams.add(words[i] + " " + words[i + 1]);
+    }
+  }
+}
+
+// Returns { text, removed }. removed = number of words judged to be echo.
+function filterEcho(text) {
+  const words = text.split(/\s+/).filter(Boolean);
+  const n = words.length;
+
+  if (!answerBigrams.size || n < 2) return { text, removed: 0 };
+
+  const norm = words.map(normToken);
+
+  // matchPair[i] is true when words i and i+1 appear side by side in a recent answer.
+  const matchPair = [];
+  for (let i = 0; i < n - 1; i++) {
+    matchPair.push(
+      !!norm[i] && !!norm[i + 1] &&
+      answerBigrams.has(norm[i] + " " + norm[i + 1])
+    );
+  }
+
+  // Case A: most of the utterance is copied from an answer -> ignore it all.
+  const matched = new Array(n).fill(false);
+  matchPair.forEach((hit, i) => {
+    if (hit) { matched[i] = true; matched[i + 1] = true; }
+  });
+  const matchedCount = matched.filter(Boolean).length;
+
+  const needed = n >= ECHO_MIN_WORDS ? ECHO_RATIO : 1;
+  if (n >= 3 && matchedCount / n >= needed) {
+    return { text: "", removed: n };
+  }
+
+  // Case B: cut out long copied runs, keep the rest (a real question that
+  // came right after you finished reading).
+  const echo = new Array(n).fill(false);
+  let i = 0;
+  while (i < n - 1) {
+    if (matchPair[i]) {
+      let j = i;
+      while (j < n - 1 && matchPair[j]) j++;
+      if (j - i + 1 >= ECHO_RUN_WORDS) {
+        for (let k = i; k <= j; k++) echo[k] = true;
+      }
+      i = j;
+    } else {
+      i++;
+    }
+  }
+
+  const kept = words.filter((_, k) => !echo[k]);
+  const removed = n - kept.length;
+
+  if (removed === 0) return { text, removed: 0 };
+  if (kept.length < 3) return { text: "", removed };
+  return { text: kept.join(" "), removed };
+}
+
+function markSpeechConsumed() {
+  clearTimeout(speechTimer);
+  pendingSpeech = "";
+  committedSpeech = "";
+  sessionStart = lastResultsLen;
+}
 
 const $ = id => document.getElementById(id);
 
@@ -523,9 +646,23 @@ function scheduleQuestionSubmission() {
 }
 
 async function submitCompletedSpeech() {
-  const question = applySpeechFixes(pendingSpeech);
+  let question = applySpeechFixes(pendingSpeech);
 
   if (!question || isLocked || isProcessing) return;
+
+  // Drop speech that is just you reading an answer from the screen.
+  if ($("echoFilter").checked) {
+    const echo = filterEcho(question);
+
+    if (echo.removed > 0) {
+      if (!echo.text) {
+        markSpeechConsumed();
+        setLive("Ignored: this sounded like you reading the last answer.");
+        return;
+      }
+      question = echo.text;
+    }
+  }
 
   // Do not submit incomplete starters such as "what is".
   if (isIncompleteQuestion(question)) {
@@ -620,6 +757,8 @@ function toggleLock() {
 
 function clearFeed() {
   $("feed").replaceChildren();
+  recentAnswers = [];
+  answerBigrams = new Set();
   lastQuestion = "";
   resetSpeechState();
   setLive("Feed cleared. Ready for the next question.");
@@ -804,6 +943,7 @@ Rules:
         "\nCheck API key, model availability, quota and internet.";
       setStatus("REQUEST FAILED", "red");
     } else {
+      rememberAnswer(output.textContent);
       setStatus("ANSWER READY", "green");
     }
   } catch (error) {
