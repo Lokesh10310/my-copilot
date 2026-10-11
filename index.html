@@ -2,165 +2,201 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<meta name="theme-color" content="#060913">
-<title>Parakeet Engine Pro</title>
-<style>
-*{box-sizing:border-box}
-body{margin:0;padding:14px;background:#060913;color:#f1f5f9;font-family:system-ui,Arial,sans-serif}
-header{display:flex;justify-content:space-between;align-items:center;gap:8px;border-bottom:1px solid #263247;padding-bottom:13px;margin-bottom:14px}
-.brand{font:800 19px monospace;color:#38bdf8}
-.badge{font-size:11px;font-weight:800;padding:6px 9px;border-radius:20px;background:#1e293b}
-.green{background:#064e3b;color:#6ee7b7}.orange{background:#78350f;color:#fcd34d}.red{background:#7f1d1d;color:#fecaca}
-input{width:100%;padding:13px;margin-bottom:10px;border:1px solid #334155;border-radius:9px;background:#0f172a;color:#f1f5f9;font-size:14px}
-.hint{font-size:12px;color:#94a3b8;line-height:1.5;margin-bottom:12px}
-.controls{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px}
-button{border:0;border-radius:9px;padding:13px 8px;min-height:48px;font-size:13px;font-weight:800;cursor:pointer}
-.primary{background:#10b981;color:#022c22}.stop{background:#ef4444;color:white}.secondary{background:#334155;color:white}.clear{background:#1e293b;color:#cbd5e1}
-.panel,.card{padding:13px;background:#0b1120;border:1px solid #263247;border-radius:10px;margin-bottom:12px}
-.panel{border-left:4px solid #38bdf8}
-.label{font-size:11px;text-transform:uppercase;letter-spacing:.7px;color:#94a3b8;margin-bottom:7px}
-.transcript,.answer{white-space:pre-wrap;overflow-wrap:anywhere;line-height:1.6;font-size:14px;min-height:36px}
-.card{border-left:4px solid #10b981}.question{font-size:12px;color:#94a3b8;margin-bottom:9px}
-.answer{font-size:15px}.foot{font-size:11px;color:#64748b;line-height:1.5;margin-top:18px}
-</style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#060913">
+  <title>Parakeet Engine Pro</title>
+
+  <style>
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      padding: 14px;
+      background: #060913;
+      color: #f1f5f9;
+      font-family: system-ui, Arial, sans-serif;
+    }
+
+    .top {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 8px;
+      padding-bottom: 12px;
+      border-bottom: 1px solid #263247;
+      margin-bottom: 14px;
+    }
+
+    .brand {
+      color: #38bdf8;
+      font-family: monospace;
+      font-size: 19px;
+      font-weight: 800;
+    }
+
+    .badge {
+      padding: 5px 9px;
+      border-radius: 20px;
+      background: #1e293b;
+      color: #cbd5e1;
+      font-size: 11px;
+      font-weight: 800;
+    }
+
+    .green { background: #064e3b; color: #6ee7b7; }
+    .orange { background: #78350f; color: #fcd34d; }
+    .red { background: #7f1d1d; color: #fecaca; }
+
+    input {
+      display: block;
+      width: 100%;
+      padding: 14px;
+      margin-bottom: 10px;
+      border: 1px solid #334155;
+      border-radius: 10px;
+      background: #0f172a;
+      color: #e2e8f0;
+      font-size: 14px;
+    }
+
+    .hint {
+      margin-bottom: 12px;
+      color: #94a3b8;
+      font-size: 12px;
+      line-height: 1.5;
+    }
+
+    .controls {
+      display: grid;
+      grid-template-columns: 1.4fr 1fr .7fr;
+      gap: 8px;
+      margin-bottom: 14px;
+    }
+
+    button {
+      min-height: 54px;
+      padding: 10px 5px;
+      border: 0;
+      border-radius: 10px;
+      font-size: 13px;
+      font-weight: 800;
+      cursor: pointer;
+    }
+
+    #listenBtn { background: #10b981; color: #022c22; }
+    #listenBtn.active { background: #ef4444; color: white; }
+    #lockBtn { background: #334155; color: white; }
+    #lockBtn.active { background: #eab308; color: #111827; }
+    #clearBtn { background: #1e293b; color: #cbd5e1; }
+
+    .live {
+      min-height: 42px;
+      padding: 10px;
+      margin-bottom: 12px;
+      border: 1px solid #263247;
+      border-radius: 8px;
+      color: #94a3b8;
+      font-size: 13px;
+      line-height: 1.5;
+      overflow-wrap: anywhere;
+    }
+
+    .card {
+      padding: 14px;
+      margin-bottom: 12px;
+      background: #0b1120;
+      border: 1px solid #263247;
+      border-left: 4px solid #38bdf8;
+      border-radius: 10px;
+    }
+
+    .question {
+      margin-bottom: 10px;
+      color: #94a3b8;
+      font-size: 12px;
+      overflow-wrap: anywhere;
+    }
+
+    .answer {
+      color: #f1f5f9;
+      font-size: 15px;
+      line-height: 1.6;
+      white-space: pre-wrap;
+      overflow-wrap: anywhere;
+    }
+
+    .foot {
+      margin-top: 20px;
+      color: #64748b;
+      font-size: 11px;
+      line-height: 1.5;
+    }
+  </style>
 </head>
+
 <body>
+  <div class="top">
+    <div class="brand">PARAKEET ENGINE</div>
+    <span id="status" class="badge">STANDBY</span>
+  </div>
 
-<header>
-  <div class="brand">PARAKEET ENGINE</div>
-  <span id="status" class="badge">STANDBY</span>
-</header>
+  <input
+    id="apiKey"
+    type="password"
+    placeholder="Paste Gemini API key"
+    autocomplete="off"
+    autocapitalize="off"
+    spellcheck="false"
+  >
 
-<input id="apiKey" type="password" placeholder="Paste Gemini API key" autocomplete="off">
-<div class="hint">Mock-interview practice with automatic question detection. Keep your API key private.</div>
+  <div class="hint">
+    Your API key is not saved by this page. Never commit it to GitHub.
+  </div>
 
-<div class="controls">
-  <button id="micBtn" class="primary" onclick="toggleMic()">Start Listening</button>
-  <button id="pauseBtn" class="secondary" onclick="togglePause()">Pause Listening</button>
-</div>
+  <div class="controls">
+    <button id="listenBtn" onclick="toggleListening()">Start Mic</button>
+    <button id="lockBtn" onclick="toggleLock()">Block Speech</button>
+    <button id="clearBtn" onclick="clearFeed()">Clear</button>
+  </div>
 
-<div class="panel">
-  <div class="label">Live transcript</div>
-  <div id="transcript" class="transcript">Start listening and speak naturally.</div>
-</div>
+  <div id="live" class="live">
+    Ready. Ask your complete interview question.
+  </div>
 
-<div class="controls">
-  <button class="clear" onclick="clearFeed()">Clear Answers</button>
-  <button class="secondary" onclick="clearTranscript()">Clear Transcript</button>
-</div>
+  <div id="feed"></div>
 
-<div id="feed"></div>
-
-<div class="foot">
-Speech recognition can occasionally mishear words or disconnect.
-Check the transcript if it does not match what you said.
-</div>
+  <div class="foot">
+    Speech is submitted after a pause. If a question sounds incomplete,
+    finish speaking and pause again. Microphone recognition requires
+    a supported browser and internet connection.
+  </div>
 
 <script>
 "use strict";
 
-const $ = id => document.getElementById(id);
-
 let recognition = null;
-let listening = false;
-let paused = false;
-let busy = false;
-let restarting = false;
-let pending = "";
-let interim = "";
-let timer = null;
+let isListening = false;
+let isLocked = false;
+let isProcessing = false;
 let wakeLock = null;
+
+let pendingSpeech = "";
+let speechTimer = null;
 let lastQuestion = "";
 let lastQuestionAt = 0;
-let conversation = [];
 
-const PAUSE_MS = 2200;
+const SPEECH_PAUSE_MS = 1800;
+
+const $ = id => document.getElementById(id);
 
 function setStatus(text, type = "") {
   $("status").textContent = text;
   $("status").className = "badge " + type;
 }
 
-function clean(text) {
-  return text.replace(/\s+/g, " ").trim();
-}
-
-function tokens(text) {
-  return clean(text).toLowerCase().match(/[\p{L}\p{N}']+/gu) || [];
-}
-
-// Remove duplicated consecutive filler words.
-function removeRepeatedWords(text) {
-  const words = clean(text).split(/\s+/);
-  const out = [];
-
-  for (const word of words) {
-    const prev = (out[out.length - 1] || "")
-      .toLowerCase().replace(/[.,!?]+/g, "");
-    const curr = word.toLowerCase().replace(/[.,!?]+/g, "");
-
-    if (curr === prev && /^(okay|ok|um|uh|hmm|yeah|so)$/i.test(curr)) {
-      continue;
-    }
-
-    out.push(word);
-  }
-
-  return out.join(" ");
-}
-
-// Merge overlapping recognition chunks rather than appending them blindly.
-function mergeSpeech(existing, incoming) {
-  existing = clean(existing);
-  incoming = clean(incoming);
-
-  if (!existing) return removeRepeatedWords(incoming);
-  if (!incoming) return existing;
-
-  const a = tokens(existing);
-  const b = tokens(incoming);
-
-  if (!a.length || !b.length) return existing;
-
-  // Ignore a repeated transcript or an already-heard shorter fragment.
-  const normA = a.join(" ");
-  const normB = b.join(" ");
-
-  if (normA === normB || normA.endsWith(" " + normB)) {
-    return existing;
-  }
-
-  // Find the largest overlap between the end of the existing transcript
-  // and the start of the new fragment.
-  let overlap = 0;
-  const max = Math.min(a.length, b.length, 40);
-
-  for (let n = 1; n <= max; n++) {
-    const suffix = a.slice(-n).join(" ");
-    const prefix = b.slice(0, n).join(" ");
-
-    if (suffix === prefix) overlap = n;
-  }
-
-  let merged;
-
-  if (overlap > 0) {
-    merged = existing + " " + b.slice(overlap).join(" ");
-  } else if (normB.startsWith(normA + " ")) {
-    // Incoming transcript is a longer revision of the current text.
-    merged = incoming;
-  } else {
-    merged = existing + " " + incoming;
-  }
-
-  return removeRepeatedWords(merged);
-}
-
-function showTranscript() {
-  $("transcript").textContent =
-    clean(pending + " " + interim) || "Listening for speech...";
+function setLive(text) {
+  $("live").textContent = text;
 }
 
 function createCard(question) {
@@ -169,170 +205,257 @@ function createCard(question) {
 
   const q = document.createElement("div");
   q.className = "question";
-  q.textContent = "Practice question: " + question;
+  q.textContent = "Q: " + question;
 
   const a = document.createElement("div");
   a.className = "answer";
-  a.textContent = "Generating answer...";
+  a.textContent = "Waiting for complete question...";
 
   card.append(q, a);
   $("feed").prepend(card);
+
   return a;
 }
 
-function getKey() {
-  const key = $("apiKey").value.replace(/[\s\u200B-\u200D\uFEFF]/g, "");
+function getApiKey() {
+  const key = $("apiKey").value
+    .replace(/[\s\u200B-\u200D\uFEFF]/g, "")
+    .trim();
+
   return /^[\x21-\x7E]+$/.test(key) ? key : "";
 }
 
-function isIncomplete(text) {
-  const s = clean(text).toLowerCase()
-    .replace(/[.!?]+$/g, "").trim();
-
-  if (s.length < 8) return true;
-
-  const patterns = [
-    /^(okay|ok|right|so|yeah|hmm|um|uh)$/,
-    /^(okay|ok|so|right|now|first) (we|let's|lets|i|will|shall)$/,
-    /^(what|why|how|when|where|who|which)$/,
-    /^(what|why|how|when|where|who|which) (is|are|do|does|did|can|could|would|will|should)$/,
-    /^(what about|how about|difference between|explain|define|describe|tell me about)$/,
-    /^(how do you|how would you|what do you|what would you)$/
-  ];
-
-  if (patterns.some(p => p.test(s))) return true;
-
-  // A topic introduction should not trigger an answer.
-  if (/\b(let's|lets|we will|we'll|moving on|coming to)\b/i.test(s) &&
-      !/[?]/.test(text) &&
-      !/\b(how do you|how would you|what is|what are|explain|define|describe)\b/i.test(s)) {
-    return true;
-  }
-
-  return false;
+function normalizeText(text) {
+  return text
+    .replace(/\s+/g, " ")
+    .replace(/^[\s.,!?;:]+|[\s,;:]+$/g, "")
+    .trim();
 }
 
-function looksLikeQuestion(text) {
-  const s = clean(text);
+// These phrases usually mean the speaker has not finished the question.
+function isIncompleteQuestion(text) {
+  const q = normalizeText(text)
+    .toLowerCase()
+    .replace(/[.!?]+$/, "")
+    .trim();
 
-  if (s.length < 12 || isIncomplete(s)) return false;
+  const incompletePatterns = [
+    /^what is$/,
+    /^what are$/,
+    /^what was$/,
+    /^what were$/,
+    /^what do$/,
+    /^what does$/,
+    /^what did$/,
+    /^what will$/,
+    /^what would$/,
+    /^what can$/,
+    /^what should$/,
+    /^what about$/,
+    /^why is$/,
+    /^why are$/,
+    /^why do$/,
+    /^why does$/,
+    /^how is$/,
+    /^how are$/,
+    /^how do$/,
+    /^how does$/,
+    /^how did$/,
+    /^how can$/,
+    /^how to$/,
+    /^when is$/,
+    /^when do$/,
+    /^when does$/,
+    /^where is$/,
+    /^where are$/,
+    /^who is$/,
+    /^which is$/,
+    /^difference between$/,
+    /^explain$/,
+    /^define$/,
+    /^tell me about$/,
+    /^can you explain$/,
+    /^could you explain$/,
+    /^please explain$/
+  ];
 
-  return /[?]/.test(s) ||
-    /^(what|why|how|when|where|who|which|can|could|would|should|do|does|did|is|are|explain|define|describe|compare|tell me)\b/i.test(s) ||
-    /\b(how do you|how would you|what is|what are|difference between|write a query|find the|remove duplicates|handle null|explain the|describe the)\b/i.test(s);
+  return incompletePatterns.some(pattern => pattern.test(q));
+}
+
+function updateMicButton() {
+  const btn = $("listenBtn");
+  btn.textContent = isListening ? "Stop Mic" : "Start Mic";
+  btn.classList.toggle("active", isListening);
+}
+
+function updateLockButton() {
+  const btn = $("lockBtn");
+  btn.textContent = isLocked ? "Speech Blocked" : "Block Speech";
+  btn.classList.toggle("active", isLocked);
+}
+
+async function keepAwake() {
+  try {
+    if ("wakeLock" in navigator) {
+      wakeLock = await navigator.wakeLock.request("screen");
+    }
+  } catch (error) {
+    // Optional browser feature.
+  }
 }
 
 function initSpeech() {
-  const API = window.SpeechRecognition || window.webkitSpeechRecognition;
+  const SpeechAPI =
+    window.SpeechRecognition ||
+    window.webkitSpeechRecognition;
 
-  if (!API) {
+  if (!SpeechAPI) {
     alert("Speech recognition is unavailable. Try Chrome.");
     return null;
   }
 
-  const rec = new API();
+  const rec = new SpeechAPI();
   rec.continuous = true;
   rec.interimResults = true;
   rec.lang = "en-IN";
   rec.maxAlternatives = 1;
 
   rec.onresult = event => {
-    if (paused || busy) return;
+    if (isLocked || isProcessing) return;
 
+    let interim = "";
     let finalText = "";
-    let interimText = "";
 
     for (let i = event.resultIndex; i < event.results.length; i++) {
       const result = event.results[i];
-      const text = result[0].transcript;
+      const transcript = result[0].transcript.trim();
 
-      if (result.isFinal) finalText += text + " ";
-      else interimText += text + " ";
+      if (result.isFinal) {
+        finalText += transcript + " ";
+      } else {
+        interim += transcript + " ";
+      }
     }
 
+    // Accumulate FINAL fragments instead of submitting each one.
     if (finalText.trim()) {
-      pending = mergeSpeech(pending, finalText);
-      interim = "";
-      scheduleDetection();
+      pendingSpeech = normalizeText(
+        pendingSpeech + " " + finalText
+      );
+
+      scheduleQuestionSubmission();
     }
 
-    // Interim results are previews, not additional permanent text.
-    interim = clean(interimText);
-    showTranscript();
+    if (interim.trim()) {
+      setLive("Hearing: " + normalizeText(
+        pendingSpeech + " " + interim
+      ));
+    } else if (pendingSpeech) {
+      setLive("Recognized: " + pendingSpeech +
+        "\nWaiting for you to finish...");
+    }
   };
 
   rec.onerror = event => {
     if (event.error === "not-allowed" ||
         event.error === "service-not-allowed") {
-      listening = false;
+      isListening = false;
       updateMicButton();
       setStatus("MIC DENIED", "red");
-      $("transcript").textContent = "Allow microphone permission in browser settings.";
-    } else if (event.error === "network") {
-      setStatus("SPEECH NETWORK ERROR", "red");
-      $("transcript").textContent =
-        "Speech recognition network error. Check your connection and restart listening.";
+      setLive("Microphone permission denied. Allow it in browser settings.");
+      return;
+    }
+
+    if (event.error === "network") {
+      setLive(
+        "Speech recognition network error. Check internet access. " +
+        "The browser speech service may be temporarily unavailable."
+      );
     } else if (event.error !== "no-speech" &&
                event.error !== "aborted") {
-      $("transcript").textContent = "Speech error: " + event.error;
+      setLive("Microphone error: " + event.error);
     }
   };
 
   rec.onend = () => {
-    restarting = false;
-
-    if (!listening || paused) return;
+    if (!isListening) return;
 
     setTimeout(() => {
-      if (!listening || paused || restarting) return;
+      if (!isListening) return;
 
       try {
-        restarting = true;
         rec.start();
-      } catch (e) {
-        restarting = false;
+      } catch (error) {
+        // Ignore a start request if recognition is already active.
       }
-    }, 350);
+    }, 300);
   };
 
   return rec;
 }
 
-function scheduleDetection() {
-  clearTimeout(timer);
+function scheduleQuestionSubmission() {
+  clearTimeout(speechTimer);
 
-  timer = setTimeout(() => {
-    interim = "";
-    showTranscript();
-
-    if (looksLikeQuestion(pending)) {
-      setStatus("QUESTION DETECTED", "green");
-      autoAnswer();
-    } else if (pending) {
-      setStatus("LISTENING", "green");
-    }
-  }, PAUSE_MS);
+  speechTimer = setTimeout(() => {
+    submitCompletedSpeech();
+  }, SPEECH_PAUSE_MS);
 }
 
-async function toggleMic() {
-  if (listening) {
-    listening = false;
-    clearTimeout(timer);
+async function submitCompletedSpeech() {
+  const question = normalizeText(pendingSpeech);
 
-    try { recognition?.stop(); } catch (e) {}
+  if (!question || isLocked || isProcessing) return;
+
+  // Do not submit incomplete starters such as "what is".
+  if (isIncompleteQuestion(question)) {
+    setLive(
+      'I heard "' + question +
+      '". Please continue your question; I am waiting.'
+    );
+    return;
+  }
+
+  // Ignore fragments that are too short to be useful.
+  if (question.length < 5) {
+    setLive("Waiting for more speech...");
+    return;
+  }
+
+  pendingSpeech = "";
+  clearTimeout(speechTimer);
+
+  await dispatchAI(question);
+}
+
+async function toggleListening() {
+  if (isListening) {
+    isListening = false;
+    clearTimeout(speechTimer);
+
+    if (recognition) {
+      try { recognition.stop(); } catch (error) {}
+    }
 
     if (wakeLock) {
-      try { await wakeLock.release(); } catch (e) {}
+      try { await wakeLock.release(); } catch (error) {}
       wakeLock = null;
     }
 
     updateMicButton();
     setStatus("STANDBY");
+    setLive("Microphone stopped.");
     return;
   }
 
-  if (!getKey()) {
-    alert("Paste a valid Gemini API key first.");
+  if (!$("apiKey").value.trim()) {
+    alert("Paste your Gemini API key first.");
+    $("apiKey").focus();
+    return;
+  }
+
+  if (!getApiKey()) {
+    alert("Your API key contains invalid characters. Copy it again.");
     return;
   }
 
@@ -341,165 +464,239 @@ async function toggleMic() {
 
   try {
     recognition.start();
-    listening = true;
-    paused = false;
-    $("pauseBtn").textContent = "Pause Listening";
+    isListening = true;
     updateMicButton();
     setStatus("LISTENING", "green");
-    $("transcript").textContent = "Listening. Speak naturally.";
-
-    try {
-      if ("wakeLock" in navigator) {
-        wakeLock = await navigator.wakeLock.request("screen");
-      }
-    } catch (e) {}
-  } catch (e) {
+    setLive("Listening. Speak your full question naturally.");
+    await keepAwake();
+  } catch (error) {
     setStatus("MIC ERROR", "red");
-    $("transcript").textContent = "Could not start microphone. Retry.";
+    setLive("Could not start microphone. Tap Start Mic again.");
   }
 }
 
-function updateMicButton() {
-  $("micBtn").textContent = listening ? "Stop Listening" : "Start Listening";
-  $("micBtn").className = listening ? "stop" : "primary";
-}
+function toggleLock() {
+  isLocked = !isLocked;
+  updateLockButton();
 
-function togglePause() {
-  paused = !paused;
-  $("pauseBtn").textContent = paused ? "Resume Listening" : "Pause Listening";
-
-  if (paused) {
-    try { recognition?.stop(); } catch (e) {}
-    setStatus("PAUSED", "orange");
-  } else if (listening && recognition) {
-    try { recognition.start(); } catch (e) {}
-    setStatus("LISTENING", "green");
+  if (isLocked) {
+    clearTimeout(speechTimer);
+    setLive("Speech blocked. Tap Speech Blocked to resume.");
+  } else {
+    setLive("Speech resumed. Ask your complete question.");
+    if (pendingSpeech) scheduleQuestionSubmission();
   }
-}
-
-function clearTranscript() {
-  pending = "";
-  interim = "";
-  clearTimeout(timer);
-  showTranscript();
-  setStatus(listening ? "LISTENING" : "STANDBY", listening ? "green" : "");
 }
 
 function clearFeed() {
   $("feed").replaceChildren();
+  pendingSpeech = "";
+  lastQuestion = "";
+  clearTimeout(speechTimer);
+  setLive("Feed cleared. Ready for the next question.");
 }
 
-async function autoAnswer() {
-  if (busy || paused) return;
+async function dispatchAI(question) {
+  if (isProcessing) {
+    // Preserve the question rather than silently losing it.
+    pendingSpeech = normalizeText(
+      pendingSpeech + " " + question
+    );
+    setLive("Question queued. Waiting for the current answer.");
+    return;
+  }
 
-  const question = clean(pending);
-  if (!looksLikeQuestion(question)) return;
+  const key = getApiKey();
+
+  if (!key) {
+    setStatus("INVALID KEY", "red");
+    setLive("Check your Gemini API key.");
+    return;
+  }
 
   const now = Date.now();
 
-  if (question === lastQuestion && now - lastQuestionAt < 10000) return;
+  if (question === lastQuestion && now - lastQuestionAt < 4000) {
+    return;
+  }
 
-  pending = "";
-  interim = "";
   lastQuestion = question;
   lastQuestionAt = now;
-  clearTimeout(timer);
 
-  busy = true;
-  setStatus("GENERATING", "orange");
+  isProcessing = true;
+  setStatus("THINKING", "orange");
+  setLive("Question captured. Generating answer...");
 
   const output = createCard(question);
-  const key = getKey();
 
-  const prompt = `
-You are a concise mock-interview practice coach for ETL and Data Engineering.
+  let succeeded = false;
+  let lastError = "No response received.";
 
-Recent conversation context:
-${conversation.slice(-8).join("\n") || "(None)"}
+  const systemPrompt = `
+You are a concise technical interview assistant for ETL and Data Engineering.
 
-Current question:
-${question}
+Topics: Informatica PowerCenter, SQL, PostgreSQL, Redshift,
+Snowflake, dbt, AWS, ETL and data warehousing.
 
-Answer the current technical question accurately.
-For SQL questions, show executable SQL first.
-For conceptual questions, give a definition and concise bullets.
-Keep answers under 100 words unless code needs more.
-Use clear, practical language suitable for interview practice.
+Rules:
+- SQL questions: output executable SQL first, then up to 2 short notes.
+- Conceptual questions: give a direct definition and 3 concise bullets.
+- Keep answers under 60 words unless code needs more.
+- Be technically accurate and specific.
+- No greetings, introductions or filler.
+- Answer the actual question, not an assumed unrelated question.
 `;
 
-  let answer = "";
-  let errorMessage = "No response received.";
-
-  const models = ["gemini-3.5-flash-lite", "gemini-3.8-flash"];
+  // A fallback is attempted if the first model is unavailable.
+  const models = [
+    "gemini-3.5-flash-lite",
+    "gemini-3.8-flash"
+  ];
 
   try {
     for (const model of models) {
+      let response;
+
       try {
-        const response = await fetch(
+        const url =
           "https://generativelanguage.googleapis.com/v1beta/models/" +
-          model + ":generateContent",
-          {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              "x-goog-api-key": key
+          encodeURIComponent(model) +
+          ":streamGenerateContent?alt=sse";
+
+        response = await fetch(url, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "x-goog-api-key": key
+          },
+          body: JSON.stringify({
+            system_instruction: {
+              parts: [{ text: systemPrompt }]
             },
-            body: JSON.stringify({
-              contents: [{ parts: [{ text: prompt }] }],
-              generationConfig: {
-                temperature: 0.2,
-                maxOutputTokens: 300
-              }
-            })
-          }
-        );
-
-        if (!response.ok) {
-          const data = await response.json().catch(() => ({}));
-          errorMessage = data.error?.message || ("HTTP " + response.status);
-
-          if ([400, 401, 403].includes(response.status)) break;
-          continue;
-        }
-
-        const data = await response.json();
-        answer = (data.candidates?.[0]?.content?.parts || [])
-          .map(p => p.text || "").join("").trim();
-
-        if (answer) break;
-      } catch (e) {
-        errorMessage = e.message || "Network error.";
+            contents: [{
+              role: "user",
+              parts: [{ text: question }]
+            }],
+            generationConfig: {
+              temperature: 0.1,
+              maxOutputTokens: 180
+            }
+          })
+        });
+      } catch (error) {
+        lastError = "Network error: " + error.message;
+        continue;
       }
+
+      if (!response.ok) {
+        const err = await response.json().catch(() => ({}));
+        lastError = err.error?.message ||
+          ("HTTP " + response.status + " for " + model);
+
+        if ([400, 401, 403].includes(response.status)) break;
+        continue;
+      }
+
+      if (!response.body) {
+        lastError = "Streaming is not supported by this browser.";
+        continue;
+      }
+
+      let answer = "";
+      let buffer = "";
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+
+      try {
+        while (true) {
+          const result = await reader.read();
+
+          buffer += decoder.decode(
+            result.value || new Uint8Array(),
+            { stream: !result.done }
+          );
+
+          const lines = buffer.split(/\r?\n/);
+          buffer = lines.pop() || "";
+
+          for (const line of lines) {
+            const clean = line.trim();
+            if (!clean.startsWith("data:")) continue;
+
+            const payload = clean.slice(5).trim();
+            if (!payload || payload === "[DONE]") continue;
+
+            try {
+              const data = JSON.parse(payload);
+              const parts =
+                data.candidates?.[0]?.content?.parts || [];
+
+              for (const part of parts) {
+                if (typeof part.text === "string") {
+                  answer += part.text;
+                }
+              }
+
+              if (answer) output.textContent = answer;
+
+              const reason = data.promptFeedback?.blockReason;
+              if (reason) lastError = "Prompt blocked: " + reason;
+            } catch (error) {
+              // Ignore incomplete event data.
+            }
+          }
+
+          if (result.done) break;
+        }
+      } finally {
+        reader.releaseLock();
+      }
+
+      if (!answer.trim()) {
+        lastError = lastError === "No response received."
+          ? "The model returned an empty response."
+          : lastError;
+        continue;
+      }
+
+      succeeded = true;
+      break;
     }
 
-    if (answer) {
-      output.textContent = answer;
-      conversation.push("Question: " + question + "\nAnswer: " + answer);
-      conversation = conversation.slice(-8);
-      setStatus("ANSWER READY", "green");
-    } else {
-      output.textContent = "Request failed: " + errorMessage;
+    if (!succeeded) {
+      output.textContent =
+        "Request failed: " + lastError +
+        "\nCheck API key, model availability, quota and internet.";
       setStatus("REQUEST FAILED", "red");
+    } else {
+      setStatus("ANSWER READY", "green");
     }
+  } catch (error) {
+    output.textContent = "Error: " +
+      (error.message || String(error));
+    setStatus("ERROR", "red");
   } finally {
-    busy = false;
+    isProcessing = false;
 
-    if (listening && !paused) {
+    if (isListening) {
       setStatus("LISTENING", "green");
-      if (pending) scheduleDetection();
-    } else if (!listening) {
+
+      // Process any question that arrived while the answer was generating.
+      if (pendingSpeech && !isLocked) {
+        scheduleQuestionSubmission();
+        setLive("Answer complete. Processing the next question...");
+      } else {
+        setLive("Ready for the next complete question.");
+      }
+    } else if (succeeded) {
       setStatus("STANDBY");
     }
   }
 }
 
 document.addEventListener("visibilitychange", async () => {
-  if (document.visibilityState === "visible" && listening && !wakeLock) {
-    try {
-      if ("wakeLock" in navigator) {
-        wakeLock = await navigator.wakeLock.request("screen");
-      }
-    } catch (e) {}
+  if (document.visibilityState === "visible" && isListening) {
+    await keepAwake();
   }
 });
 </script>
