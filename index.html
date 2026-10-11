@@ -8,7 +8,7 @@
     body {
       background: #090d16;
       color: #f1f5f9;
-      font-family: system-ui, -apple-system, sans-serif;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
       margin: 0;
       padding: 16px;
       line-height: 1.4;
@@ -182,7 +182,7 @@
       const answerBox = card.querySelector('.a-text');
 
       try {
-        const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${key}`;
+        const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent?key=${key}`;
         const res = await fetch(url, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
