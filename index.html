@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -181,7 +180,17 @@ let isLocked = false;
 let isProcessing = false;
 let wakeLock = null;
 
+// ---- Speech state -------------------------------------------------------
+// pendingSpeech   : the full question text collected so far
+// committedSpeech : text kept from earlier recognition sessions (restarts)
+// sessionStart    : first index in event.results that belongs to the
+//                   current question (anything before it was already used)
+// lastResultsLen  : length of event.results at the last event
 let pendingSpeech = "";
+let committedSpeech = "";
+let sessionStart = 0;
+let lastResultsLen = 0;
+
 let speechTimer = null;
 let lastQuestion = "";
 let lastQuestionAt = 0;
@@ -230,6 +239,116 @@ function normalizeText(text) {
     .replace(/\s+/g, " ")
     .replace(/^[\s.,!?;:]+|[\s,;:]+$/g, "")
     .trim();
+}
+
+function resetSpeechState() {
+  clearTimeout(speechTimer);
+  pendingSpeech = "";
+  committedSpeech = "";
+  sessionStart = lastResultsLen;
+}
+
+// ---- Transcript cleanup -------------------------------------------------
+
+// Lowercase, strip punctuation, collapse spaces (for comparisons only).
+function plain(text) {
+  return text
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}\s]/gu, "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+// Word-boundary-safe "startsWith".
+function wordsStartWith(longer, shorter) {
+  return (longer + " ").startsWith(shorter + " ");
+}
+
+/*
+  WHY THIS EXISTS (the bug in your screenshot):
+  On Android Chrome, with continuous = true and interimResults = true,
+  every partial result is delivered as its own entry in event.results,
+  each one a longer copy of the previous one, e.g.
+      "what" / "what is" / "what is the" / "what is the information"
+  and they are often flagged isFinal. Concatenating them gives
+  "what what is what is the what is the information ..." which is exactly
+  the garbage shown in your screenshot.
+
+  Fix: rebuild the transcript from event.results and, whenever a result is
+  just a longer version of the previous one, REPLACE it instead of appending.
+*/
+function buildTranscript(results, startIndex) {
+  const parts = [];
+
+  for (let i = startIndex; i < results.length; i++) {
+    const text = normalizeText(results[i][0].transcript || "");
+    if (!text) continue;
+
+    if (!parts.length) {
+      parts.push(text);
+      continue;
+    }
+
+    const prev = parts[parts.length - 1];
+    const p = plain(prev);
+    const c = plain(text);
+
+    // Exact duplicate, or a shorter earlier version: ignore it.
+    if (c === p || wordsStartWith(p, c)) continue;
+
+    // New result is an extension of the previous one: replace it.
+    if (wordsStartWith(c, p)) {
+      parts[parts.length - 1] = text;
+      continue;
+    }
+
+    // Recognizer revised only the last word of the previous result
+    // (e.g. "centre" -> "center powercenter"): replace as well.
+    const pw = p.split(" ");
+    const cw = c.split(" ");
+    if (
+      pw.length >= 4 &&
+      cw.length >= pw.length &&
+      pw.slice(0, -1).join(" ") === cw.slice(0, pw.length - 1).join(" ")
+    ) {
+      parts[parts.length - 1] = text;
+      continue;
+    }
+
+    // Genuinely new sentence/phrase.
+    parts.push(text);
+  }
+
+  return parts.join(" ");
+}
+
+/*
+  Speech recognition often mishears technical terms
+  ("Informatica PowerCenter" -> "information of our centre").
+  These fixes are applied to the question before it is shown / sent.
+  Add your own terms here.
+*/
+const SPEECH_FIXES = [
+  [/\binformation(?:s)?(?:\s+(?:of|off|or|up))?\s+(?:our\s+|are\s+)?(?:power\s*)?cent(?:re|er)\b/gi, "Informatica PowerCenter"],
+  [/\binformatic(?:a|s|ar|er)?\b/gi, "Informatica"],
+  [/\bpower\s*cent(?:re|er)\b/gi, "PowerCenter"],
+  [/\bred\s*shift\b/gi, "Redshift"],
+  [/\bsnow\s*flake\b/gi, "Snowflake"],
+  [/\bd\s?b\s?t\b/gi, "dbt"],
+  [/\b(?:see\s?quel|sequel|s\s?q\s?l)\b/gi, "SQL"],
+  [/\bpost\s?gres(?:s)?(?:\s?(?:sql|sequel|s\s?q\s?l))?\b/gi, "PostgreSQL"],
+  [/\be\s?t\s?l\b/gi, "ETL"],
+  [/\bmap\s?let(?:s)?\b/gi, "mapplet"],
+  [/\bairflow\b/gi, "Airflow"],
+  [/\bpie\s?spark\b/gi, "PySpark"]
+];
+
+function applySpeechFixes(text) {
+  let out = text;
+  for (const [pattern, replacement] of SPEECH_FIXES) {
+    out = out.replace(pattern, replacement);
+  }
+  return normalizeText(out);
 }
 
 // These phrases usually mean the speaker has not finished the question.
@@ -320,40 +439,35 @@ function initSpeech() {
   rec.lang = "en-IN";
   rec.maxAlternatives = 1;
 
+  // A fresh session started: clear any stale "MIC DENIED"/error badge.
+  rec.onstart = () => {
+    sessionStart = 0;
+    lastResultsLen = 0;
+    if (isListening && !isProcessing) setStatus("LISTENING", "green");
+  };
+
   rec.onresult = event => {
-    if (isLocked || isProcessing) return;
+    lastResultsLen = event.results.length;
 
-    let interim = "";
-    let finalText = "";
-
-    for (let i = event.resultIndex; i < event.results.length; i++) {
-      const result = event.results[i];
-      const transcript = result[0].transcript.trim();
-
-      if (result.isFinal) {
-        finalText += transcript + " ";
-      } else {
-        interim += transcript + " ";
-      }
+    // Ignore anything heard while blocked or while an answer is generating,
+    // and make sure it is not picked up later.
+    if (isLocked || isProcessing) {
+      sessionStart = event.results.length;
+      return;
     }
 
-    // Accumulate FINAL fragments instead of submitting each one.
-    if (finalText.trim()) {
-      pendingSpeech = normalizeText(
-        pendingSpeech + " " + finalText
-      );
+    if (sessionStart > event.results.length) sessionStart = 0;
 
-      scheduleQuestionSubmission();
-    }
+    const transcript = buildTranscript(event.results, sessionStart);
+    pendingSpeech = normalizeText(committedSpeech + " " + transcript);
 
-    if (interim.trim()) {
-      setLive("Hearing: " + normalizeText(
-        pendingSpeech + " " + interim
-      ));
-    } else if (pendingSpeech) {
-      setLive("Recognized: " + pendingSpeech +
-        "\nWaiting for you to finish...");
-    }
+    if (!pendingSpeech) return;
+
+    setLive("Hearing: " + applySpeechFixes(pendingSpeech));
+
+    // Restart the countdown on every result (interim or final), so we
+    // only submit after the speaker has really paused.
+    scheduleQuestionSubmission();
   };
 
   rec.onerror = event => {
@@ -378,6 +492,12 @@ function initSpeech() {
   };
 
   rec.onend = () => {
+    // Keep what was heard so far; the next session starts with an
+    // empty results list.
+    committedSpeech = pendingSpeech;
+    sessionStart = 0;
+    lastResultsLen = 0;
+
     if (!isListening) return;
 
     setTimeout(() => {
@@ -403,7 +523,7 @@ function scheduleQuestionSubmission() {
 }
 
 async function submitCompletedSpeech() {
-  const question = normalizeText(pendingSpeech);
+  const question = applySpeechFixes(pendingSpeech);
 
   if (!question || isLocked || isProcessing) return;
 
@@ -422,7 +542,10 @@ async function submitCompletedSpeech() {
     return;
   }
 
+  // Mark everything heard so far as used, so it is never re-submitted.
   pendingSpeech = "";
+  committedSpeech = "";
+  sessionStart = lastResultsLen;
   clearTimeout(speechTimer);
 
   await dispatchAI(question);
@@ -442,6 +565,7 @@ async function toggleListening() {
       wakeLock = null;
     }
 
+    resetSpeechState();
     updateMicButton();
     setStatus("STANDBY");
     setLive("Microphone stopped.");
@@ -463,6 +587,9 @@ async function toggleListening() {
   if (!recognition) return;
 
   try {
+    resetSpeechState();
+    sessionStart = 0;
+    lastResultsLen = 0;
     recognition.start();
     isListening = true;
     updateMicButton();
@@ -481,18 +608,20 @@ function toggleLock() {
 
   if (isLocked) {
     clearTimeout(speechTimer);
+    pendingSpeech = "";
+    committedSpeech = "";
+    sessionStart = lastResultsLen;
     setLive("Speech blocked. Tap Speech Blocked to resume.");
   } else {
+    sessionStart = lastResultsLen;
     setLive("Speech resumed. Ask your complete question.");
-    if (pendingSpeech) scheduleQuestionSubmission();
   }
 }
 
 function clearFeed() {
   $("feed").replaceChildren();
-  pendingSpeech = "";
   lastQuestion = "";
-  clearTimeout(speechTimer);
+  resetSpeechState();
   setLive("Feed cleared. Ready for the next question.");
 }
 
@@ -538,11 +667,17 @@ You are a concise technical interview assistant for ETL and Data Engineering.
 Topics: Informatica PowerCenter, SQL, PostgreSQL, Redshift,
 Snowflake, dbt, AWS, ETL and data warehousing.
 
+The question comes from speech-to-text and may contain mishearings of
+technical terms (for example "information of our centre" means
+"Informatica PowerCenter", "red shift" means "Redshift"). Silently
+interpret it as the most likely data-engineering question.
+
 Rules:
 - SQL questions: output executable SQL first, then up to 2 short notes.
 - Conceptual questions: give a direct definition and 3 concise bullets.
 - Keep answers under 60 words unless code needs more.
 - Be technically accurate and specific.
+- Plain text only: no markdown, no ** or # characters. Use "-" for bullets.
 - No greetings, introductions or filler.
 - Answer the actual question, not an assumed unrelated question.
 `;
@@ -678,16 +813,14 @@ Rules:
   } finally {
     isProcessing = false;
 
+    // Anything said while the answer was generating is discarded.
+    pendingSpeech = "";
+    committedSpeech = "";
+    sessionStart = lastResultsLen;
+
     if (isListening) {
       setStatus("LISTENING", "green");
-
-      // Process any question that arrived while the answer was generating.
-      if (pendingSpeech && !isLocked) {
-        scheduleQuestionSubmission();
-        setLive("Answer complete. Processing the next question...");
-      } else {
-        setLive("Ready for the next complete question.");
-      }
+      setLive("Ready for the next complete question.");
     } else if (succeeded) {
       setStatus("STANDBY");
     }
