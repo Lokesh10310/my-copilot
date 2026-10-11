@@ -31,8 +31,8 @@
     .brand {
       color: #38bdf8;
       font-family: monospace;
-      font-weight: 800;
       font-size: 19px;
+      font-weight: 800;
     }
 
     .badge {
@@ -49,6 +49,7 @@
     .red { background: #7f1d1d; color: #fecaca; }
 
     input {
+      display: block;
       width: 100%;
       padding: 14px;
       margin-bottom: 10px;
@@ -60,10 +61,10 @@
     }
 
     .hint {
+      margin-bottom: 12px;
       color: #94a3b8;
       font-size: 12px;
       line-height: 1.5;
-      margin-bottom: 12px;
     }
 
     .controls {
@@ -97,6 +98,7 @@
       border-radius: 8px;
       color: #94a3b8;
       font-size: 13px;
+      line-height: 1.5;
       overflow-wrap: anywhere;
     }
 
@@ -110,9 +112,9 @@
     }
 
     .question {
+      margin-bottom: 10px;
       color: #94a3b8;
       font-size: 12px;
-      margin-bottom: 10px;
       overflow-wrap: anywhere;
     }
 
@@ -125,10 +127,10 @@
     }
 
     .foot {
+      margin-top: 20px;
       color: #64748b;
       font-size: 11px;
       line-height: 1.5;
-      margin-top: 20px;
     }
   </style>
 </head>
@@ -149,8 +151,7 @@
   >
 
   <div class="hint">
-    Paste your key directly from Google AI Studio.
-    Never put your API key in this HTML file or commit it to GitHub.
+    Your API key is not saved by this page. Never commit it to GitHub.
   </div>
 
   <div class="controls">
@@ -159,12 +160,16 @@
     <button id="clearBtn" onclick="clearFeed()">Clear</button>
   </div>
 
-  <div id="live" class="live">Ready to listen.</div>
+  <div id="live" class="live">
+    Ready. Ask your complete interview question.
+  </div>
+
   <div id="feed"></div>
 
   <div class="foot">
-    Requires microphone permission, internet access and an available
-    Gemini API model. Browser speech recognition availability varies.
+    Speech is submitted after a pause. If a question sounds incomplete,
+    finish speaking and pause again. Microphone recognition requires
+    a supported browser and internet connection.
   </div>
 
 <script>
@@ -175,8 +180,13 @@ let isListening = false;
 let isLocked = false;
 let isProcessing = false;
 let wakeLock = null;
+
+let pendingSpeech = "";
+let speechTimer = null;
 let lastQuestion = "";
 let lastQuestionAt = 0;
+
+const SPEECH_PAUSE_MS = 1800;
 
 const $ = id => document.getElementById(id);
 
@@ -199,81 +209,77 @@ function createCard(question) {
 
   const a = document.createElement("div");
   a.className = "answer";
-  a.textContent = "Generating answer...";
+  a.textContent = "Waiting for complete question...";
 
   card.append(q, a);
   $("feed").prepend(card);
+
   return a;
 }
 
-function initSpeech() {
-  const SpeechAPI =
-    window.SpeechRecognition ||
-    window.webkitSpeechRecognition;
+function getApiKey() {
+  const key = $("apiKey").value
+    .replace(/[\s\u200B-\u200D\uFEFF]/g, "")
+    .trim();
 
-  if (!SpeechAPI) {
-    alert("Speech recognition is unavailable. Try Chrome.");
-    return null;
-  }
+  return /^[\x21-\x7E]+$/.test(key) ? key : "";
+}
 
-  const rec = new SpeechAPI();
-  rec.continuous = true;
-  rec.interimResults = true;
-  rec.lang = "en-IN";
+function normalizeText(text) {
+  return text
+    .replace(/\s+/g, " ")
+    .replace(/^[\s.,!?;:]+|[\s,;:]+$/g, "")
+    .trim();
+}
 
-  rec.onresult = event => {
-    if (isLocked || isProcessing) return;
+// These phrases usually mean the speaker has not finished the question.
+function isIncompleteQuestion(text) {
+  const q = normalizeText(text)
+    .toLowerCase()
+    .replace(/[.!?]+$/, "")
+    .trim();
 
-    let interim = "";
-    let finalText = "";
+  const incompletePatterns = [
+    /^what is$/,
+    /^what are$/,
+    /^what was$/,
+    /^what were$/,
+    /^what do$/,
+    /^what does$/,
+    /^what did$/,
+    /^what will$/,
+    /^what would$/,
+    /^what can$/,
+    /^what should$/,
+    /^what about$/,
+    /^why is$/,
+    /^why are$/,
+    /^why do$/,
+    /^why does$/,
+    /^how is$/,
+    /^how are$/,
+    /^how do$/,
+    /^how does$/,
+    /^how did$/,
+    /^how can$/,
+    /^how to$/,
+    /^when is$/,
+    /^when do$/,
+    /^when does$/,
+    /^where is$/,
+    /^where are$/,
+    /^who is$/,
+    /^which is$/,
+    /^difference between$/,
+    /^explain$/,
+    /^define$/,
+    /^tell me about$/,
+    /^can you explain$/,
+    /^could you explain$/,
+    /^please explain$/
+  ];
 
-    for (let i = event.resultIndex; i < event.results.length; i++) {
-      const result = event.results[i];
-      if (result.isFinal) {
-        finalText += result[0].transcript + " ";
-      } else {
-        interim += result[0].transcript;
-      }
-    }
-
-    if (interim.trim()) {
-      setLive("Hearing: " + interim.trim());
-    }
-
-    const question = finalText.trim();
-
-    if (question.length >= 4) {
-      dispatchAI(question);
-    }
-  };
-
-  rec.onerror = event => {
-    if (event.error === "not-allowed" ||
-        event.error === "service-not-allowed") {
-      isListening = false;
-      updateMicButton();
-      setStatus("MIC DENIED", "red");
-      setLive("Allow microphone access in browser settings.");
-    } else if (event.error !== "no-speech" &&
-               event.error !== "aborted") {
-      setLive("Microphone error: " + event.error);
-    }
-  };
-
-  rec.onend = () => {
-    if (!isListening) return;
-
-    setTimeout(() => {
-      if (!isListening) return;
-      try {
-        rec.start();
-      } catch (error) {
-        // Avoid restarting an already active recognition session.
-      }
-    }, 250);
-  };
-
-  return rec;
+  return incompletePatterns.some(pattern => pattern.test(q));
 }
 
 function updateMicButton() {
@@ -294,13 +300,138 @@ async function keepAwake() {
       wakeLock = await navigator.wakeLock.request("screen");
     }
   } catch (error) {
-    // Screen wake lock is optional.
+    // Optional browser feature.
   }
+}
+
+function initSpeech() {
+  const SpeechAPI =
+    window.SpeechRecognition ||
+    window.webkitSpeechRecognition;
+
+  if (!SpeechAPI) {
+    alert("Speech recognition is unavailable. Try Chrome.");
+    return null;
+  }
+
+  const rec = new SpeechAPI();
+  rec.continuous = true;
+  rec.interimResults = true;
+  rec.lang = "en-IN";
+  rec.maxAlternatives = 1;
+
+  rec.onresult = event => {
+    if (isLocked || isProcessing) return;
+
+    let interim = "";
+    let finalText = "";
+
+    for (let i = event.resultIndex; i < event.results.length; i++) {
+      const result = event.results[i];
+      const transcript = result[0].transcript.trim();
+
+      if (result.isFinal) {
+        finalText += transcript + " ";
+      } else {
+        interim += transcript + " ";
+      }
+    }
+
+    // Accumulate FINAL fragments instead of submitting each one.
+    if (finalText.trim()) {
+      pendingSpeech = normalizeText(
+        pendingSpeech + " " + finalText
+      );
+
+      scheduleQuestionSubmission();
+    }
+
+    if (interim.trim()) {
+      setLive("Hearing: " + normalizeText(
+        pendingSpeech + " " + interim
+      ));
+    } else if (pendingSpeech) {
+      setLive("Recognized: " + pendingSpeech +
+        "\nWaiting for you to finish...");
+    }
+  };
+
+  rec.onerror = event => {
+    if (event.error === "not-allowed" ||
+        event.error === "service-not-allowed") {
+      isListening = false;
+      updateMicButton();
+      setStatus("MIC DENIED", "red");
+      setLive("Microphone permission denied. Allow it in browser settings.");
+      return;
+    }
+
+    if (event.error === "network") {
+      setLive(
+        "Speech recognition network error. Check internet access. " +
+        "The browser speech service may be temporarily unavailable."
+      );
+    } else if (event.error !== "no-speech" &&
+               event.error !== "aborted") {
+      setLive("Microphone error: " + event.error);
+    }
+  };
+
+  rec.onend = () => {
+    if (!isListening) return;
+
+    setTimeout(() => {
+      if (!isListening) return;
+
+      try {
+        rec.start();
+      } catch (error) {
+        // Ignore a start request if recognition is already active.
+      }
+    }, 300);
+  };
+
+  return rec;
+}
+
+function scheduleQuestionSubmission() {
+  clearTimeout(speechTimer);
+
+  speechTimer = setTimeout(() => {
+    submitCompletedSpeech();
+  }, SPEECH_PAUSE_MS);
+}
+
+async function submitCompletedSpeech() {
+  const question = normalizeText(pendingSpeech);
+
+  if (!question || isLocked || isProcessing) return;
+
+  // Do not submit incomplete starters such as "what is".
+  if (isIncompleteQuestion(question)) {
+    setLive(
+      'I heard "' + question +
+      '". Please continue your question; I am waiting.'
+    );
+    return;
+  }
+
+  // Ignore fragments that are too short to be useful.
+  if (question.length < 5) {
+    setLive("Waiting for more speech...");
+    return;
+  }
+
+  pendingSpeech = "";
+  clearTimeout(speechTimer);
+
+  await dispatchAI(question);
 }
 
 async function toggleListening() {
   if (isListening) {
     isListening = false;
+    clearTimeout(speechTimer);
 
     if (recognition) {
       try { recognition.stop(); } catch (error) {}
@@ -317,9 +448,14 @@ async function toggleListening() {
     return;
   }
 
-  if (!getApiKey()) {
-    alert("Enter a valid Gemini API key first.");
+  if (!$("apiKey").value.trim()) {
+    alert("Paste your Gemini API key first.");
     $("apiKey").focus();
+    return;
+  }
+
+  if (!getApiKey()) {
+    alert("Your API key contains invalid characters. Copy it again.");
     return;
   }
 
@@ -331,11 +467,11 @@ async function toggleListening() {
     isListening = true;
     updateMicButton();
     setStatus("LISTENING", "green");
-    setLive("Listening for speech...");
+    setLive("Listening. Speak your full question naturally.");
     await keepAwake();
   } catch (error) {
     setStatus("MIC ERROR", "red");
-    setLive("Could not start microphone. Try again.");
+    setLive("Could not start microphone. Tap Start Mic again.");
   }
 }
 
@@ -343,39 +479,43 @@ function toggleLock() {
   isLocked = !isLocked;
   updateLockButton();
 
-  setLive(isLocked
-    ? "Speech recognition paused."
-    : "Speech recognition resumed.");
+  if (isLocked) {
+    clearTimeout(speechTimer);
+    setLive("Speech blocked. Tap Speech Blocked to resume.");
+  } else {
+    setLive("Speech resumed. Ask your complete question.");
+    if (pendingSpeech) scheduleQuestionSubmission();
+  }
 }
 
 function clearFeed() {
   $("feed").replaceChildren();
-  setLive("Feed cleared.");
-}
-
-function getApiKey() {
-  // Google API keys should contain only ASCII characters.
-  // Remove surrounding/invisible whitespace, not arbitrary key characters.
-  const key = $("apiKey").value
-    .replace(/[\s\u200B-\u200D\uFEFF]/g, "")
-    .trim();
-
-  if (!key) return "";
-
-  if (!/^[\x21-\x7E]+$/.test(key)) {
-    return "";
-  }
-
-  return key;
+  pendingSpeech = "";
+  lastQuestion = "";
+  clearTimeout(speechTimer);
+  setLive("Feed cleared. Ready for the next question.");
 }
 
 async function dispatchAI(question) {
-  question = question.trim();
-  if (!question || isProcessing) return;
+  if (isProcessing) {
+    // Preserve the question rather than silently losing it.
+    pendingSpeech = normalizeText(
+      pendingSpeech + " " + question
+    );
+    setLive("Question queued. Waiting for the current answer.");
+    return;
+  }
+
+  const key = getApiKey();
+
+  if (!key) {
+    setStatus("INVALID KEY", "red");
+    setLive("Check your Gemini API key.");
+    return;
+  }
 
   const now = Date.now();
 
-  // Ignore duplicate final transcripts.
   if (question === lastQuestion && now - lastQuestionAt < 4000) {
     return;
   }
@@ -383,28 +523,20 @@ async function dispatchAI(question) {
   lastQuestion = question;
   lastQuestionAt = now;
 
-  const key = getApiKey();
-
-  if (!key) {
-    setStatus("INVALID KEY", "red");
-    setLive("Check your API key. Paste it again from Google AI Studio.");
-    return;
-  }
-
   isProcessing = true;
   setStatus("THINKING", "orange");
-  setLive("Sending question to Gemini...");
+  setLive("Question captured. Generating answer...");
 
   const output = createCard(question);
+
   let succeeded = false;
   let lastError = "No response received.";
 
   const systemPrompt = `
-You are a concise technical interview practice assistant
-for ETL and Data Engineering.
+You are a concise technical interview assistant for ETL and Data Engineering.
 
 Topics: Informatica PowerCenter, SQL, PostgreSQL, Redshift,
-Snowflake, dbt, AWS and data warehousing.
+Snowflake, dbt, AWS, ETL and data warehousing.
 
 Rules:
 - SQL questions: output executable SQL first, then up to 2 short notes.
@@ -412,10 +544,10 @@ Rules:
 - Keep answers under 60 words unless code needs more.
 - Be technically accurate and specific.
 - No greetings, introductions or filler.
-- If a question is unclear, state a brief assumption.
+- Answer the actual question, not an assumed unrelated question.
 `;
 
-  // Stable model IDs from Google's current model documentation.
+  // A fallback is attempted if the first model is unavailable.
   const models = [
     "gemini-3.5-flash-lite",
     "gemini-3.8-flash"
@@ -452,7 +584,7 @@ Rules:
           })
         });
       } catch (error) {
-        lastError = error.message || "Network request failed.";
+        lastError = "Network error: " + error.message;
         continue;
       }
 
@@ -461,7 +593,6 @@ Rules:
         lastError = err.error?.message ||
           ("HTTP " + response.status + " for " + model);
 
-        // Invalid key/request errors need correction, not a fallback.
         if ([400, 401, 403].includes(response.status)) break;
         continue;
       }
@@ -506,17 +637,12 @@ Rules:
                 }
               }
 
-              // Render each streamed chunk immediately.
               if (answer) output.textContent = answer;
 
-              const blockReason =
-                data.promptFeedback?.blockReason;
-
-              if (blockReason) {
-                lastError = "Prompt blocked: " + blockReason;
-              }
+              const reason = data.promptFeedback?.blockReason;
+              if (reason) lastError = "Prompt blocked: " + reason;
             } catch (error) {
-              // Ignore incomplete SSE data lines.
+              // Ignore incomplete event data.
             }
           }
 
@@ -528,7 +654,7 @@ Rules:
 
       if (!answer.trim()) {
         lastError = lastError === "No response received."
-          ? "Empty response. Check model access and safety feedback."
+          ? "The model returned an empty response."
           : lastError;
         continue;
       }
@@ -540,8 +666,7 @@ Rules:
     if (!succeeded) {
       output.textContent =
         "Request failed: " + lastError +
-        "\n\nCheck your API key, model access, quota and internet connection.";
-
+        "\nCheck API key, model availability, quota and internet.";
       setStatus("REQUEST FAILED", "red");
     } else {
       setStatus("ANSWER READY", "green");
@@ -555,9 +680,14 @@ Rules:
 
     if (isListening) {
       setStatus("LISTENING", "green");
-      setLive(isLocked
-        ? "Speech recognition paused."
-        : "Ready for the next question.");
+
+      // Process any question that arrived while the answer was generating.
+      if (pendingSpeech && !isLocked) {
+        scheduleQuestionSubmission();
+        setLive("Answer complete. Processing the next question...");
+      } else {
+        setLive("Ready for the next complete question.");
+      }
     } else if (succeeded) {
       setStatus("STANDBY");
     }
