@@ -27,13 +27,14 @@ button{border:0;border-radius:9px;padding:13px 8px;min-height:48px;font-size:13p
 </style>
 </head>
 <body>
+
 <header>
   <div class="brand">PARAKEET ENGINE</div>
   <span id="status" class="badge">STANDBY</span>
 </header>
 
 <input id="apiKey" type="password" placeholder="Paste Gemini API key" autocomplete="off">
-<div class="hint">Automatic mock-interview practice. Keep your API key private; never put it in your GitHub source.</div>
+<div class="hint">Mock-interview practice with automatic question detection. Keep your API key private.</div>
 
 <div class="controls">
   <button id="micBtn" class="primary" onclick="toggleMic()">Start Listening</button>
@@ -42,7 +43,7 @@ button{border:0;border-radius:9px;padding:13px 8px;min-height:48px;font-size:13p
 
 <div class="panel">
   <div class="label">Live transcript</div>
-  <div id="transcript" class="transcript">Ready. Start listening to begin.</div>
+  <div id="transcript" class="transcript">Start listening and speak naturally.</div>
 </div>
 
 <div class="controls">
@@ -51,7 +52,11 @@ button{border:0;border-radius:9px;padding:13px 8px;min-height:48px;font-size:13p
 </div>
 
 <div id="feed"></div>
-<div class="foot">Speech recognition requires a supported browser and internet connection. Review the transcript for accuracy. Automatic question detection is best-effort and may occasionally miss or misinterpret speech.</div>
+
+<div class="foot">
+Speech recognition can occasionally mishear words or disconnect.
+Check the transcript if it does not match what you said.
+</div>
 
 <script>
 "use strict";
@@ -71,16 +76,86 @@ let lastQuestion = "";
 let lastQuestionAt = 0;
 let conversation = [];
 
-const PAUSE_MS = 1900;
-const MAX_CONTEXT = 8;
+const PAUSE_MS = 2200;
 
 function setStatus(text, type = "") {
   $("status").textContent = text;
   $("status").className = "badge " + type;
 }
 
-function clean(s) {
-  return s.replace(/\s+/g, " ").trim();
+function clean(text) {
+  return text.replace(/\s+/g, " ").trim();
+}
+
+function tokens(text) {
+  return clean(text).toLowerCase().match(/[\p{L}\p{N}']+/gu) || [];
+}
+
+// Remove duplicated consecutive filler words.
+function removeRepeatedWords(text) {
+  const words = clean(text).split(/\s+/);
+  const out = [];
+
+  for (const word of words) {
+    const prev = (out[out.length - 1] || "")
+      .toLowerCase().replace(/[.,!?]+/g, "");
+    const curr = word.toLowerCase().replace(/[.,!?]+/g, "");
+
+    if (curr === prev && /^(okay|ok|um|uh|hmm|yeah|so)$/i.test(curr)) {
+      continue;
+    }
+
+    out.push(word);
+  }
+
+  return out.join(" ");
+}
+
+// Merge overlapping recognition chunks rather than appending them blindly.
+function mergeSpeech(existing, incoming) {
+  existing = clean(existing);
+  incoming = clean(incoming);
+
+  if (!existing) return removeRepeatedWords(incoming);
+  if (!incoming) return existing;
+
+  const a = tokens(existing);
+  const b = tokens(incoming);
+
+  if (!a.length || !b.length) return existing;
+
+  // Ignore a repeated transcript or an already-heard shorter fragment.
+  const normA = a.join(" ");
+  const normB = b.join(" ");
+
+  if (normA === normB || normA.endsWith(" " + normB)) {
+    return existing;
+  }
+
+  // Find the largest overlap between the end of the existing transcript
+  // and the start of the new fragment.
+  let overlap = 0;
+  const max = Math.min(a.length, b.length, 40);
+
+  for (let n = 1; n <= max; n++) {
+    const suffix = a.slice(-n).join(" ");
+    const prefix = b.slice(0, n).join(" ");
+
+    if (suffix === prefix) overlap = n;
+  }
+
+  let merged;
+
+  if (overlap > 0) {
+    merged = existing + " " + b.slice(overlap).join(" ");
+  } else if (normB.startsWith(normA + " ")) {
+    // Incoming transcript is a longer revision of the current text.
+    merged = incoming;
+  } else {
+    merged = existing + " " + incoming;
+  }
+
+  return removeRepeatedWords(merged);
 }
 
 function showTranscript() {
@@ -106,61 +181,56 @@ function createCard(question) {
 }
 
 function getKey() {
-  const key = $("apiKey").value
-    .replace(/[\s\u200B-\u200D\uFEFF]/g, "");
+  const key = $("apiKey").value.replace(/[\s\u200B-\u200D\uFEFF]/g, "");
   return /^[\x21-\x7E]+$/.test(key) ? key : "";
-}
-
-function isFillerOrTransition(text) {
-  const s = clean(text).toLowerCase()
-    .replace(/[.,!?]+$/g, "").trim();
-
-  return /^(okay|ok|all right|alright|so|yeah|yes|right|hmm|umm|um|uh|huh|thank you|thanks|let's move on|lets move on|let's go to|lets go to|we will go to|we'll go to|first we will go to|first we'll go to|let us go to|now let's discuss|now lets discuss|let's discuss|lets discuss|coming to|moving to|next topic|anyway|actually|basically)(\s+(to|the|our|some|a|an|sql|etl|concepts|topic|next|first|now|we|will|lets|let's|discuss|question|questions|then|about|regarding|regards))*$/i.test(s);
 }
 
 function isIncomplete(text) {
   const s = clean(text).toLowerCase()
     .replace(/[.!?]+$/g, "").trim();
 
-  if (isFillerOrTransition(s)) return true;
+  if (s.length < 8) return true;
 
   const patterns = [
+    /^(okay|ok|right|so|yeah|hmm|um|uh)$/,
+    /^(okay|ok|so|right|now|first) (we|let's|lets|i|will|shall)$/,
     /^(what|why|how|when|where|who|which)$/,
-    /^(what|why|how|when|where|who|which) (is|are|was|were|do|does|did|can|could|would|will|should)$/,
-    /^(what about|how about|difference between|explain|define|describe|tell me about|can you explain|could you explain|please explain)$/,
-    /^(how do you|how would you|what do you|what would you|can you|could you|tell me how)$/,
-    /^(let's|lets|we will|we'll|first we|now we|okay|ok)/
+    /^(what|why|how|when|where|who|which) (is|are|do|does|did|can|could|would|will|should)$/,
+    /^(what about|how about|difference between|explain|define|describe|tell me about)$/,
+    /^(how do you|how would you|what do you|what would you)$/
   ];
 
-  return patterns.some(p => p.test(s));
+  if (patterns.some(p => p.test(s))) return true;
+
+  // A topic introduction should not trigger an answer.
+  if (/\b(let's|lets|we will|we'll|moving on|coming to)\b/i.test(s) &&
+      !/[?]/.test(text) &&
+      !/\b(how do you|how would you|what is|what are|explain|define|describe)\b/i.test(s)) {
+    return true;
+  }
+
+  return false;
 }
 
 function looksLikeQuestion(text) {
   const s = clean(text);
+
   if (s.length < 12 || isIncomplete(s)) return false;
 
-  const lower = s.toLowerCase();
-  const explicitQuestion = /\?/.test(s);
-  const interrogative = /^(what|why|how|when|where|who|which|can|could|would|should|do|does|did|is|are|explain|define|describe|compare|tell me)\b/i.test(s);
-  const taskPhrase = /\b(how do you|how would you|what is|what are|what happens|difference between|write a query|find the|handle null|remove duplicates|implement|explain the|describe the)\b/i.test(lower);
-
-  // Don't treat topic introductions as questions.
-  if (/\b(let's|lets|we will|we'll|first we|moving on|coming to)\b/i.test(lower) &&
-      !explicitQuestion && !taskPhrase) return false;
-
-  return explicitQuestion || interrogative || taskPhrase;
+  return /[?]/.test(s) ||
+    /^(what|why|how|when|where|who|which|can|could|would|should|do|does|did|is|are|explain|define|describe|compare|tell me)\b/i.test(s) ||
+    /\b(how do you|how would you|what is|what are|difference between|write a query|find the|remove duplicates|handle null|explain the|describe the)\b/i.test(s);
 }
 
 function initSpeech() {
-  const SpeechAPI =
-    window.SpeechRecognition || window.webkitSpeechRecognition;
+  const API = window.SpeechRecognition || window.webkitSpeechRecognition;
 
-  if (!SpeechAPI) {
-    alert("Speech recognition is unavailable. Try Google Chrome.");
+  if (!API) {
+    alert("Speech recognition is unavailable. Try Chrome.");
     return null;
   }
 
-  const rec = new SpeechAPI();
+  const rec = new API();
   rec.continuous = true;
   rec.interimResults = true;
   rec.lang = "en-IN";
@@ -174,20 +244,21 @@ function initSpeech() {
 
     for (let i = event.resultIndex; i < event.results.length; i++) {
       const result = event.results[i];
-      if (result.isFinal) finalText += result[0].transcript + " ";
-      else interimText += result[0].transcript + " ";
+      const text = result[0].transcript;
+
+      if (result.isFinal) finalText += text + " ";
+      else interimText += text + " ";
     }
 
     if (finalText.trim()) {
-      pending = clean(pending + " " + finalText);
+      pending = mergeSpeech(pending, finalText);
       interim = "";
       scheduleDetection();
     }
 
-    if (interimText.trim()) interim = clean(interimText);
+    // Interim results are previews, not additional permanent text.
+    interim = clean(interimText);
     showTranscript();
-
-    if (listening) setStatus("LISTENING", "green");
   };
 
   rec.onerror = event => {
@@ -196,13 +267,11 @@ function initSpeech() {
       listening = false;
       updateMicButton();
       setStatus("MIC DENIED", "red");
-      $("transcript").textContent =
-        "Microphone access denied. Allow it in browser settings.";
+      $("transcript").textContent = "Allow microphone permission in browser settings.";
     } else if (event.error === "network") {
       setStatus("SPEECH NETWORK ERROR", "red");
       $("transcript").textContent =
-        clean(pending + " " + interim) +
-        "\nSpeech service network error. Check internet and restart listening.";
+        "Speech recognition network error. Check your connection and restart listening.";
     } else if (event.error !== "no-speech" &&
                event.error !== "aborted") {
       $("transcript").textContent = "Speech error: " + event.error;
@@ -211,10 +280,12 @@ function initSpeech() {
 
   rec.onend = () => {
     restarting = false;
+
     if (!listening || paused) return;
 
     setTimeout(() => {
       if (!listening || paused || restarting) return;
+
       try {
         restarting = true;
         rec.start();
@@ -229,18 +300,15 @@ function initSpeech() {
 
 function scheduleDetection() {
   clearTimeout(timer);
+
   timer = setTimeout(() => {
     interim = "";
     showTranscript();
 
-    if (!pending) return;
-
     if (looksLikeQuestion(pending)) {
       setStatus("QUESTION DETECTED", "green");
       autoAnswer();
-    } else if (isIncomplete(pending)) {
-      setStatus("WAITING FOR QUESTION", "orange");
-    } else {
+    } else if (pending) {
       setStatus("LISTENING", "green");
     }
   }, PAUSE_MS);
@@ -312,7 +380,6 @@ function togglePause() {
 function clearTranscript() {
   pending = "";
   interim = "";
-  lastQuestion = "";
   clearTimeout(timer);
   showTranscript();
   setStatus(listening ? "LISTENING" : "STANDBY", listening ? "green" : "");
@@ -329,9 +396,9 @@ async function autoAnswer() {
   if (!looksLikeQuestion(question)) return;
 
   const now = Date.now();
-  if (question === lastQuestion && now - lastQuestionAt < 8000) return;
 
-  // Remove the submitted question from the live buffer.
+  if (question === lastQuestion && now - lastQuestionAt < 10000) return;
+
   pending = "";
   interim = "";
   lastQuestion = question;
@@ -344,22 +411,20 @@ async function autoAnswer() {
   const output = createCard(question);
   const key = getKey();
 
-  const history = conversation.slice(-MAX_CONTEXT).join("\n");
-
   const prompt = `
-You are a concise mock-interview coach for ETL and Data Engineering.
+You are a concise mock-interview practice coach for ETL and Data Engineering.
 
-Recent conversation:
-${history || "(No earlier context)"}
+Recent conversation context:
+${conversation.slice(-8).join("\n") || "(None)"}
 
 Current question:
 ${question}
 
-Answer the current complete technical question.
-For SQL questions, provide executable SQL first.
-For concepts, provide a direct definition and concise bullets.
-Keep answers practical, accurate, and under 100 words unless code needs more.
-If the question is a topic transition rather than a question, say so briefly.
+Answer the current technical question accurately.
+For SQL questions, show executable SQL first.
+For conceptual questions, give a definition and concise bullets.
+Keep answers under 100 words unless code needs more.
+Use clear, practical language suitable for interview practice.
 `;
 
   let answer = "";
@@ -392,6 +457,7 @@ If the question is a topic transition rather than a question, say so briefly.
         if (!response.ok) {
           const data = await response.json().catch(() => ({}));
           errorMessage = data.error?.message || ("HTTP " + response.status);
+
           if ([400, 401, 403].includes(response.status)) break;
           continue;
         }
@@ -401,7 +467,6 @@ If the question is a topic transition rather than a question, say so briefly.
           .map(p => p.text || "").join("").trim();
 
         if (answer) break;
-        errorMessage = "Empty model response.";
       } catch (e) {
         errorMessage = e.message || "Network error.";
       }
@@ -410,7 +475,7 @@ If the question is a topic transition rather than a question, say so briefly.
     if (answer) {
       output.textContent = answer;
       conversation.push("Question: " + question + "\nAnswer: " + answer);
-      conversation = conversation.slice(-MAX_CONTEXT);
+      conversation = conversation.slice(-8);
       setStatus("ANSWER READY", "green");
     } else {
       output.textContent = "Request failed: " + errorMessage;
@@ -421,8 +486,6 @@ If the question is a topic transition rather than a question, say so briefly.
 
     if (listening && !paused) {
       setStatus("LISTENING", "green");
-
-      // Process any new speech that arrived during generation.
       if (pending) scheduleDetection();
     } else if (!listening) {
       setStatus("STANDBY");
