@@ -17,6 +17,8 @@
       font-family: system-ui, Arial, sans-serif;
     }
 
+    .wrap { max-width: 980px; margin: 0 auto; }
+
     .top {
       display: flex;
       justify-content: space-between;
@@ -47,16 +49,26 @@
     .orange { background: #78350f; color: #fcd34d; }
     .red { background: #7f1d1d; color: #fecaca; }
 
-    input {
+    input[type="password"], input[type="text"], select, textarea {
       display: block;
       width: 100%;
-      padding: 14px;
+      padding: 12px;
       margin-bottom: 10px;
       border: 1px solid #334155;
       border-radius: 10px;
       background: #0f172a;
       color: #e2e8f0;
       font-size: 14px;
+      font-family: inherit;
+    }
+
+    textarea { min-height: 110px; resize: vertical; line-height: 1.5; }
+
+    label.lbl {
+      display: block;
+      margin: 4px 0 6px;
+      color: #94a3b8;
+      font-size: 12px;
     }
 
     .hint {
@@ -65,6 +77,36 @@
       font-size: 12px;
       line-height: 1.5;
     }
+
+    details {
+      margin-bottom: 12px;
+      padding: 10px 12px;
+      border: 1px solid #263247;
+      border-radius: 10px;
+      background: #0b1120;
+    }
+
+    summary {
+      cursor: pointer;
+      color: #cbd5e1;
+      font-size: 13px;
+      font-weight: 700;
+    }
+
+    details[open] summary { margin-bottom: 12px; }
+
+    .row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+
+    .opt {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 10px;
+      color: #94a3b8;
+      font-size: 12px;
+    }
+
+    .opt input { width: auto; margin: 0; }
 
     .controls {
       display: grid;
@@ -88,21 +130,6 @@
     #lockBtn { background: #334155; color: white; }
     #lockBtn.active { background: #eab308; color: #111827; }
     #clearBtn { background: #1e293b; color: #cbd5e1; }
-
-    .opt {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      margin-bottom: 12px;
-      color: #94a3b8;
-      font-size: 12px;
-    }
-
-    .opt input {
-      display: inline-block;
-      width: auto;
-      margin: 0;
-    }
 
     .live {
       min-height: 42px;
@@ -134,10 +161,16 @@
 
     .answer {
       color: #f1f5f9;
-      font-size: 15px;
+      font-size: 18px;
       line-height: 1.6;
       white-space: pre-wrap;
       overflow-wrap: anywhere;
+    }
+
+    .meta {
+      margin-top: 10px;
+      color: #64748b;
+      font-size: 11px;
     }
 
     .foot {
@@ -146,27 +179,71 @@
       font-size: 11px;
       line-height: 1.5;
     }
+
+    @media (max-width: 600px) { .row { grid-template-columns: 1fr; } }
   </style>
 </head>
 
 <body>
+<div class="wrap">
   <div class="top">
     <div class="brand">PARAKEET ENGINE</div>
     <span id="status" class="badge">STANDBY</span>
   </div>
 
-  <input
-    id="apiKey"
-    type="password"
-    placeholder="Paste Gemini API key"
-    autocomplete="off"
-    autocapitalize="off"
-    spellcheck="false"
-  >
+  <input id="apiKey" type="password" placeholder="Paste Gemini API key"
+         autocomplete="off" autocapitalize="off" spellcheck="false">
+
+  <input id="dgKey" type="password" placeholder="Paste Deepgram API key"
+         autocomplete="off" autocapitalize="off" spellcheck="false" style="display:none">
 
   <div class="hint">
-    Your API key is not saved by this page. Never commit it to GitHub.
+    API keys are never saved by this page. Never commit them to GitHub.
   </div>
+
+  <details>
+    <summary>Settings and your context (saved in this browser)</summary>
+
+    <div class="row">
+      <div>
+        <label class="lbl" for="engine">Speech engine</label>
+        <select id="engine">
+          <option value="browser">Browser microphone (free, slower)</option>
+          <option value="deepgram">Deepgram streaming (fast, accurate)</option>
+        </select>
+      </div>
+      <div id="audioWrap" style="display:none">
+        <label class="lbl" for="audioSource">Audio source (Deepgram)</label>
+        <select id="audioSource">
+          <option value="tab">Interviewer: share a tab / system audio</option>
+          <option value="mic">My microphone</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="row">
+      <div>
+        <label class="lbl" for="style">Answer length</label>
+        <select id="style">
+          <option value="short">Short (about 40 words)</option>
+          <option value="standard" selected>Standard (about 70 words)</option>
+          <option value="detailed">Detailed (about 120 words)</option>
+        </select>
+      </div>
+      <div>
+        <label class="lbl" for="keyterms">Extra technical terms for Deepgram (comma separated)</label>
+        <input id="keyterms" type="text" placeholder="e.g. Teradata, Talend, SCD Type 2">
+      </div>
+    </div>
+
+    <label class="lbl" for="context">
+      Your background, target role or job description (used to personalise answers)
+    </label>
+    <textarea id="context" placeholder="e.g. 4 years ETL developer, Informatica PowerCenter, Redshift migration project, AWS Glue. Applying for Senior Data Engineer at ..."></textarea>
+
+    <label class="opt"><input id="simpleLang" type="checkbox"> Use simple spoken English</label>
+    <label class="opt"><input id="echoFilter" type="checkbox" checked> Ignore my voice when I read the answer aloud</label>
+  </details>
 
   <div class="controls">
     <button id="listenBtn" onclick="toggleListening()">Start Mic</button>
@@ -174,62 +251,248 @@
     <button id="clearBtn" onclick="clearFeed()">Clear</button>
   </div>
 
-  <label class="opt">
-    <input id="echoFilter" type="checkbox" checked>
-    Ignore my voice when I read the answer aloud
-  </label>
-
-  <div id="live" class="live">
-    Ready. Ask your complete interview question.
-  </div>
+  <div id="live" class="live">Ready. Ask your complete interview question.</div>
 
   <div id="feed"></div>
 
   <div class="foot">
-    Speech is submitted after a pause. If a question sounds incomplete,
-    finish speaking and pause again. Microphone recognition requires
-    a supported browser and internet connection.
+    Speech is submitted after a short pause, and answer generation starts early.
+    If you keep talking, the early attempt is cancelled and restarted with the full question.
   </div>
+</div>
 
 <script>
 "use strict";
 
-let recognition = null;
+/* =========================================================================
+   CONFIG
+   ========================================================================= */
+const MODELS = ["gemini-3.5-flash-lite", "gemini-3.8-flash"];
+const FIRST_TOKEN_TIMEOUT_MS = 4500;   // give up on a model that is silent this long
+const MAX_OUTPUT_TOKENS = 600;         // thinking tokens count too, so keep headroom
+const HISTORY_TURNS = 3;               // previous Q&A pairs sent for follow-up questions
+
+// Silence (ms) after your last word before the answer starts generating.
+// Complete-looking questions start early; unfinished ones wait longer.
+const PAUSE = { complete: 600, normal: 950, dangling: 1600, incomplete: 2200 };
+// Used when the speech engine itself reports "end of turn" (Deepgram).
+const END_OF_TURN = { complete: 250, normal: 550 };
+const STALE_MS = 15000;
+
+// Echo filter: ignore YOU reading the answer aloud.
+const ECHO_MIN_WORDS = 5;
+const ECHO_RATIO = 0.75;
+const ECHO_RUN_WORDS = 6;
+const MAX_REMEMBERED_ANSWERS = 3;
+
+// Terms Deepgram should listen for (keyterm prompting, Nova-3 only).
+const DEFAULT_KEYTERMS = [
+  "Informatica", "PowerCenter", "Informatica PowerCenter", "Redshift",
+  "Snowflake", "dbt", "PostgreSQL", "SQL", "ETL", "ELT", "mapplet",
+  "AWS Glue", "Airflow", "PySpark", "data warehouse", "SCD Type 2"
+];
+
+/* =========================================================================
+   STATE
+   ========================================================================= */
+let engine = null;            // active speech engine (browser or deepgram)
 let isListening = false;
 let isLocked = false;
-let isProcessing = false;
 let wakeLock = null;
+let warmTimer = null;
 
-// ---- Speech state -------------------------------------------------------
-// pendingSpeech   : the full question text collected so far
-// committedSpeech : text kept from earlier recognition sessions (restarts)
-// sessionStart    : first index in event.results that belongs to the
-//                   current question (anything before it was already used)
-// lastResultsLen  : length of event.results at the last event
-let pendingSpeech = "";
-let committedSpeech = "";
-let sessionStart = 0;
-let lastResultsLen = 0;
-
+let pendingSpeech = "";       // question text heard so far
 let speechTimer = null;
+let staleTimer = null;
+let lastSpeechAt = 0;
+
+let activeGen = null;         // the answer currently being generated
+let genCounter = 0;
 let lastQuestion = "";
 let lastQuestionAt = 0;
-
-const SPEECH_PAUSE_MS = 1800;
-
-// ---- Echo filter: ignore YOU reading the answer aloud -------------------
-// The mic cannot tell your voice from the interviewer's, so instead we
-// compare what was heard with the answers already on screen. Reading an
-// answer produces long runs of words copied from it; a real new question
-// does not.
-const ECHO_MIN_WORDS = 5;          // from this length, ECHO_RATIO applies; 3-4 word bits must match 100%
-const ECHO_RATIO = 0.75;           // share of words copied from an answer => ignore it all
-const ECHO_RUN_WORDS = 6;          // a copied run this long is cut out of the question
-const MAX_REMEMBERED_ANSWERS = 3;  // how many recent answers to compare against
+let history = [];             // [{ q, a }]
 
 let recentAnswers = [];
 let answerBigrams = new Set();
 
+const $ = id => document.getElementById(id);
+
+/* =========================================================================
+   SMALL HELPERS
+   ========================================================================= */
+function setStatus(text, type = "") {
+  $("status").textContent = text;
+  $("status").className = "badge " + type;
+}
+
+function setLive(text) { $("live").textContent = text; }
+
+function store(key, value) {
+  try { localStorage.setItem("pe_" + key, value); } catch (e) {}
+}
+
+function load(key) {
+  try { return localStorage.getItem("pe_" + key); } catch (e) { return null; }
+}
+
+function getApiKey() {
+  const key = $("apiKey").value
+    .replace(/[\s\u200B-\u200D\uFEFF]/g, "")
+    .trim();
+  return /^[\x21-\x7E]+$/.test(key) ? key : "";
+}
+
+function normalizeText(text) {
+  return text
+    .replace(/\s+/g, " ")
+    .replace(/^[\s.,!?;:]+|[\s,;:]+$/g, "")
+    .trim();
+}
+
+function plain(text) {
+  return text
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}\s]/gu, "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function wordsStartWith(longer, shorter) {
+  return (longer + " ").startsWith(shorter + " ");
+}
+
+function cleanAnswer(text) {
+  return text.replace(/\*\*/g, "").replace(/^#+\s*/gm, "");
+}
+
+/* =========================================================================
+   TRANSCRIPT CLEANUP
+   ========================================================================= */
+
+// Android Chrome returns each partial result as its own growing entry.
+// Rebuild one clean transcript instead of concatenating the duplicates.
+function buildTranscript(results, startIndex) {
+  const parts = [];
+
+  for (let i = startIndex; i < results.length; i++) {
+    const text = normalizeText(results[i][0].transcript || "");
+    if (!text) continue;
+
+    if (!parts.length) { parts.push(text); continue; }
+
+    const prev = parts[parts.length - 1];
+    const p = plain(prev);
+    const c = plain(text);
+
+    if (c === p || wordsStartWith(p, c)) continue;
+
+    if (wordsStartWith(c, p)) { parts[parts.length - 1] = text; continue; }
+
+    const pw = p.split(" ");
+    const cw = c.split(" ");
+    if (
+      pw.length >= 4 &&
+      cw.length >= pw.length &&
+      pw.slice(0, -1).join(" ") === cw.slice(0, pw.length - 1).join(" ")
+    ) {
+      parts[parts.length - 1] = text;
+      continue;
+    }
+
+    parts.push(text);
+  }
+
+  return parts.join(" ");
+}
+
+// Fix common mishearings of technical terms before the question is used.
+const SPEECH_FIXES = [
+  [/\binformation(?:s)?(?:\s+(?:of|off|or|up))?\s+(?:our\s+|are\s+)?(?:power\s*)?cent(?:re|er)\b/gi, "Informatica PowerCenter"],
+  [/\binformatic(?:a|s|ar|er)?\b/gi, "Informatica"],
+  [/\bpower\s*cent(?:re|er)\b/gi, "PowerCenter"],
+  [/\bred\s*shift\b/gi, "Redshift"],
+  [/\bsnow\s*flake\b/gi, "Snowflake"],
+  [/\bd\s?b\s?t\b/gi, "dbt"],
+  [/\b(?:see\s?quel|sequel|s\s?q\s?l)\b/gi, "SQL"],
+  [/\bpost\s?gres(?:s)?(?:\s?(?:sql|sequel|s\s?q\s?l))?\b/gi, "PostgreSQL"],
+  [/\be\s?t\s?l\b/gi, "ETL"],
+  [/\bmap\s?let(?:s)?\b/gi, "mapplet"],
+  [/\bairflow\b/gi, "Airflow"],
+  [/\bpie\s?spark\b/gi, "PySpark"]
+];
+
+function applySpeechFixes(text) {
+  let out = text;
+  for (const [pattern, replacement] of SPEECH_FIXES) {
+    out = out.replace(pattern, replacement);
+  }
+  return normalizeText(out);
+}
+
+// Leading filler such as "okay so", "alright" is removed before asking.
+const LEADING_FILLERS = /^(?:(?:ok(?:ay)?|so|alright|all right|right|well|yeah|yes|um+|uh+|hmm+|great|good|nice|cool|sure|thanks?|thank you|perfect|awesome|got it|i see|then|and|now)[\s,.!?]+)+/i;
+
+// Whole utterances that are not questions.
+const SMALL_TALK = /^(?:hello|hi|hey|good (?:morning|afternoon|evening)|thanks?(?: you)?(?: so much)?|thank you(?: so much)?|can you hear me|are you there|can you see (?:my|the) screen|how are you|nice to meet you|ok(?:ay)?|yes|yeah|right|sure|great|good|nice|cool|got it|i see|alright|perfect|awesome|um+|uh+|hmm+)[\s,.!?]*$/i;
+
+// These phrases usually mean the speaker has not finished the question.
+function isIncompleteQuestion(text) {
+  const q = normalizeText(text)
+    .toLowerCase()
+    .replace(/[.!?]+$/, "")
+    .trim();
+
+  const incompletePatterns = [
+    /^what (?:is|are|was|were|do|does|did|will|would|can|should|about)$/,
+    /^why (?:is|are|do|does)$/,
+    /^how (?:is|are|do|does|did|can|to)$/,
+    /^when (?:is|do|does)$/,
+    /^where (?:is|are)$/,
+    /^who is$/,
+    /^which is$/,
+    /^difference between$/,
+    /^explain$/,
+    /^define$/,
+    /^tell me about$/,
+    /^can you explain$/,
+    /^could you explain$/,
+    /^please explain$/
+  ];
+
+  return incompletePatterns.some(pattern => pattern.test(q));
+}
+
+const DANGLING = new Set([
+  "and", "or", "the", "a", "an", "of", "in", "on", "for", "to", "with",
+  "between", "about", "is", "are", "was", "were", "that", "which", "from",
+  "by", "at", "as", "if", "vs", "versus", "like", "than", "then", "into",
+  "using", "use", "your", "you", "do", "does", "can", "what", "how", "why"
+]);
+
+const QUESTION_START = /^(?:what|why|how|when|where|which|who|whom|whose|explain|define|describe|difference|compare|tell|walk|write|give|list|can|could|do|does|did|is|are|was|were|should|would|will|have|has)\b/;
+
+// How long to wait after the last word before generating.
+function pauseFor(text, endOfTurn) {
+  const t = applySpeechFixes(text)
+    .toLowerCase()
+    .replace(/[?.!,;:]+$/g, "")
+    .trim();
+  const words = t.split(/\s+/).filter(Boolean);
+  const last = words[words.length - 1] || "";
+
+  let kind = "normal";
+  if (isIncompleteQuestion(t) || words.length < 2) kind = "incomplete";
+  else if (DANGLING.has(last)) kind = "dangling";
+  else if (words.length >= 4 && QUESTION_START.test(t)) kind = "complete";
+
+  let ms = PAUSE[kind];
+  if (endOfTurn && END_OF_TURN[kind]) ms = END_OF_TURN[kind];
+  return { kind, ms };
+}
+
+/* =========================================================================
+   ECHO FILTER (ignore you reading the answer aloud)
+   ========================================================================= */
 function normToken(word) {
   return word.toLowerCase().replace(/[^\p{L}\p{N}]/gu, "");
 }
@@ -258,7 +521,6 @@ function rememberAnswer(text) {
   }
 }
 
-// Returns { text, removed }. removed = number of words judged to be echo.
 function filterEcho(text) {
   const words = text.split(/\s+/).filter(Boolean);
   const n = words.length;
@@ -266,8 +528,6 @@ function filterEcho(text) {
   if (!answerBigrams.size || n < 2) return { text, removed: 0 };
 
   const norm = words.map(normToken);
-
-  // matchPair[i] is true when words i and i+1 appear side by side in a recent answer.
   const matchPair = [];
   for (let i = 0; i < n - 1; i++) {
     matchPair.push(
@@ -276,7 +536,6 @@ function filterEcho(text) {
     );
   }
 
-  // Case A: most of the utterance is copied from an answer -> ignore it all.
   const matched = new Array(n).fill(false);
   matchPair.forEach((hit, i) => {
     if (hit) { matched[i] = true; matched[i + 1] = true; }
@@ -284,12 +543,8 @@ function filterEcho(text) {
   const matchedCount = matched.filter(Boolean).length;
 
   const needed = n >= ECHO_MIN_WORDS ? ECHO_RATIO : 1;
-  if (n >= 3 && matchedCount / n >= needed) {
-    return { text: "", removed: n };
-  }
+  if (n >= 3 && matchedCount / n >= needed) return { text: "", removed: n };
 
-  // Case B: cut out long copied runs, keep the rest (a real question that
-  // came right after you finished reading).
   const echo = new Array(n).fill(false);
   let i = 0;
   while (i < n - 1) {
@@ -313,22 +568,137 @@ function filterEcho(text) {
   return { text: kept.join(" "), removed };
 }
 
-function markSpeechConsumed() {
+/* =========================================================================
+   PIPELINE: speech text -> early generation -> streamed answer
+   ========================================================================= */
+
+// Every speech engine calls this with the FULL text of the current question
+// (finalised + interim words).
+function heard(text, endOfTurn = false) {
+  if (isLocked) {
+    if (engine) engine.consume();
+    pendingSpeech = "";
+    return;
+  }
+
+  const cleaned = normalizeText(text);
+  if (!cleaned) return;
+
+  if (activeGen) {
+    // The answer is already streaming: anything heard now is you reading it.
+    if (activeGen.committed) {
+      if (engine) engine.consume();
+      return;
+    }
+    // Early attempt in flight, nothing shown yet. If the words are unchanged
+    // keep going, otherwise the speaker is still talking: cancel and wait.
+    if (plain(applySpeechFixes(cleaned)) === activeGen.raw) return;
+    cancelGeneration();
+  }
+
+  if (cleaned === pendingSpeech && !endOfTurn) return;
+
+  if (cleaned !== pendingSpeech) lastSpeechAt = performance.now();
+  pendingSpeech = cleaned;
+
+  clearTimeout(staleTimer);
+  setLive("Hearing: " + applySpeechFixes(pendingSpeech));
+  scheduleSubmission(endOfTurn);
+}
+
+function scheduleSubmission(endOfTurn) {
   clearTimeout(speechTimer);
+  const { ms } = pauseFor(pendingSpeech, endOfTurn);
+  speechTimer = setTimeout(submitCompletedSpeech, ms);
+}
+
+function discardSpeech(message) {
+  clearTimeout(speechTimer);
+  clearTimeout(staleTimer);
   pendingSpeech = "";
-  committedSpeech = "";
-  sessionStart = lastResultsLen;
+  if (engine) engine.consume();
+  if (message) setLive(message);
 }
 
-const $ = id => document.getElementById(id);
+async function submitCompletedSpeech() {
+  if (isLocked || activeGen) return;
 
-function setStatus(text, type = "") {
-  $("status").textContent = text;
-  $("status").className = "badge " + type;
+  let question = applySpeechFixes(pendingSpeech);
+  if (!question) return;
+
+  const heardPlain = plain(question);
+
+  // Small talk and filler words are not questions.
+  const stripped = question.replace(LEADING_FILLERS, "").trim();
+  if (!stripped || SMALL_TALK.test(stripped) || SMALL_TALK.test(question)) {
+    discardSpeech("Ignored: not a question.");
+    return;
+  }
+  question = stripped;
+
+  // Drop speech that is just you reading an answer from the screen.
+  if ($("echoFilter").checked) {
+    const echo = filterEcho(question);
+    if (echo.removed > 0) {
+      if (!echo.text) {
+        discardSpeech("Ignored: this sounded like you reading the last answer.");
+        return;
+      }
+      question = echo.text;
+    }
+  }
+
+  if (isIncompleteQuestion(question)) {
+    setLive('I heard "' + question + '". Waiting for the rest of the question...');
+    clearTimeout(staleTimer);
+    staleTimer = setTimeout(
+      () => discardSpeech("Discarded an unfinished question."),
+      STALE_MS
+    );
+    return;
+  }
+
+  if (question.length < 5) {
+    setLive("Waiting for more speech...");
+    return;
+  }
+
+  await dispatchAI(question, heardPlain);
 }
 
-function setLive(text) {
-  $("live").textContent = text;
+function buildSystemPrompt() {
+  const words = { short: 40, standard: 70, detailed: 120 }[$("style").value] || 70;
+  const context = $("context").value.trim() ||
+    "(none provided. Assume an ETL / Data Engineering candidate: Informatica PowerCenter, SQL, PostgreSQL, Redshift, Snowflake, dbt, AWS.)";
+  const tone = $("simpleLang").checked
+    ? "Use simple, natural spoken English."
+    : "Be technically precise.";
+
+  return `You are a live interview copilot. The candidate reads your answer aloud to an interviewer within seconds.
+
+CANDIDATE CONTEXT (use it for experience and behavioural questions; never invent employers, dates or numbers that are not here, use [brackets] for missing details):
+${context}
+
+INPUT: the question comes from speech-to-text and may contain mishearings of technical terms ("information of our centre" means "Informatica PowerCenter", "red shift" means Redshift). Silently correct them to the most likely technical term. If it is a follow-up such as "give an example" or "why?", use the previous turns.
+
+FORMAT:
+- Line 1: one direct sentence that answers the question and can be spoken on its own.
+- Then at most 3 short bullets starting with "- ": key points, plus one concrete example or number.
+- SQL or code questions: runnable code first, then at most 2 short notes.
+- About ${words} words in total unless code needs more.
+- Plain text only: no markdown, no ** or #, no greeting, no filler, never restate the question.
+- ${tone}
+- If the input is not a question or request (small talk, filler, a statement, noise), output exactly [skip] and nothing else.`;
+}
+
+function buildContents(question) {
+  const contents = [];
+  for (const turn of history.slice(-HISTORY_TURNS)) {
+    contents.push({ role: "user", parts: [{ text: turn.q }] });
+    contents.push({ role: "model", parts: [{ text: turn.a }] });
+  }
+  contents.push({ role: "user", parts: [{ text: question }] });
+  return contents;
 }
 
 function createCard(question) {
@@ -341,189 +711,540 @@ function createCard(question) {
 
   const a = document.createElement("div");
   a.className = "answer";
-  a.textContent = "Waiting for complete question...";
 
-  card.append(q, a);
+  const m = document.createElement("div");
+  m.className = "meta";
+
+  card.append(q, a, m);
   $("feed").prepend(card);
 
-  return a;
+  return { answer: a, meta: m };
 }
 
-function getApiKey() {
-  const key = $("apiKey").value
-    .replace(/[\s\u200B-\u200D\uFEFF]/g, "")
-    .trim();
+// First visible token: show the card and mark this answer as "committed".
+function commitGeneration(gen) {
+  if (gen.committed) return;
+  gen.committed = true;
+  gen.firstTokenAt = performance.now();
+  gen.card = createCard(gen.question);
 
-  return /^[\x21-\x7E]+$/.test(key) ? key : "";
-}
+  const afterYou = Math.max(0, Math.round(gen.firstTokenAt - lastSpeechAt));
+  const model = Math.round(gen.firstTokenAt - gen.startedAt);
+  gen.card.meta.textContent =
+    "First words " + afterYou + " ms after you stopped speaking (model " +
+    model + " ms)";
 
-function normalizeText(text) {
-  return text
-    .replace(/\s+/g, " ")
-    .replace(/^[\s.,!?;:]+|[\s,;:]+$/g, "")
-    .trim();
-}
-
-function resetSpeechState() {
   clearTimeout(speechTimer);
+  clearTimeout(staleTimer);
   pendingSpeech = "";
-  committedSpeech = "";
-  sessionStart = lastResultsLen;
+  if (engine) engine.consume();
+  setLive("Answering...");
 }
 
-// ---- Transcript cleanup -------------------------------------------------
+function cancelGeneration() {
+  const gen = activeGen;
+  if (!gen || gen.committed) return false;
 
-// Lowercase, strip punctuation, collapse spaces (for comparisons only).
-function plain(text) {
-  return text
-    .toLowerCase()
-    .replace(/[^\p{L}\p{N}\s]/gu, "")
-    .replace(/\s+/g, " ")
-    .trim();
+  gen.cancelled = true;
+  gen.controller.abort();
+  activeGen = null;
+  lastQuestion = "";
+  if (isListening) setStatus("LISTENING", "green");
+  return true;
 }
 
-// Word-boundary-safe "startsWith".
-function wordsStartWith(longer, shorter) {
-  return (longer + " ").startsWith(shorter + " ");
+function finishGeneration(gen) {
+  if (activeGen === gen) activeGen = null;
+  pendingSpeech = "";
+  if (engine) engine.consume();
+  if (isListening) {
+    setStatus("LISTENING", "green");
+    setLive("Ready for the next complete question.");
+  } else {
+    setStatus("STANDBY");
+  }
 }
 
-/*
-  WHY THIS EXISTS (the bug in your screenshot):
-  On Android Chrome, with continuous = true and interimResults = true,
-  every partial result is delivered as its own entry in event.results,
-  each one a longer copy of the previous one, e.g.
-      "what" / "what is" / "what is the" / "what is the information"
-  and they are often flagged isFinal. Concatenating them gives
-  "what what is what is the what is the information ..." which is exactly
-  the garbage shown in your screenshot.
+const SKIP_TOKEN = "[skip]";
 
-  Fix: rebuild the transcript from event.results and, whenever a result is
-  just a longer version of the previous one, REPLACE it instead of appending.
-*/
-function buildTranscript(results, startIndex) {
-  const parts = [];
+// Called with the full streamed text so far. Decides what to show.
+function onStreamText(gen, text) {
+  if (gen.cancelled) return "stop";
 
-  for (let i = startIndex; i < results.length; i++) {
-    const text = normalizeText(results[i][0].transcript || "");
-    if (!text) continue;
-
-    if (!parts.length) {
-      parts.push(text);
-      continue;
-    }
-
-    const prev = parts[parts.length - 1];
-    const p = plain(prev);
-    const c = plain(text);
-
-    // Exact duplicate, or a shorter earlier version: ignore it.
-    if (c === p || wordsStartWith(p, c)) continue;
-
-    // New result is an extension of the previous one: replace it.
-    if (wordsStartWith(c, p)) {
-      parts[parts.length - 1] = text;
-      continue;
-    }
-
-    // Recognizer revised only the last word of the previous result
-    // (e.g. "centre" -> "center powercenter"): replace as well.
-    const pw = p.split(" ");
-    const cw = c.split(" ");
-    if (
-      pw.length >= 4 &&
-      cw.length >= pw.length &&
-      pw.slice(0, -1).join(" ") === cw.slice(0, pw.length - 1).join(" ")
-    ) {
-      parts[parts.length - 1] = text;
-      continue;
-    }
-
-    // Genuinely new sentence/phrase.
-    parts.push(text);
+  if (!gen.committed) {
+    const low = text.trimStart().toLowerCase();
+    if (!low) return "wait";
+    if (low.startsWith(SKIP_TOKEN)) return "skip";
+    if (SKIP_TOKEN.startsWith(low)) return "wait";
+    commitGeneration(gen);
   }
 
-  return parts.join(" ");
+  gen.card.answer.textContent = cleanAnswer(text);
+  return "ok";
 }
 
-/*
-  Speech recognition often mishears technical terms
-  ("Informatica PowerCenter" -> "information of our centre").
-  These fixes are applied to the question before it is shown / sent.
-  Add your own terms here.
-*/
-const SPEECH_FIXES = [
-  [/\binformation(?:s)?(?:\s+(?:of|off|or|up))?\s+(?:our\s+|are\s+)?(?:power\s*)?cent(?:re|er)\b/gi, "Informatica PowerCenter"],
-  [/\binformatic(?:a|s|ar|er)?\b/gi, "Informatica"],
-  [/\bpower\s*cent(?:re|er)\b/gi, "PowerCenter"],
-  [/\bred\s*shift\b/gi, "Redshift"],
-  [/\bsnow\s*flake\b/gi, "Snowflake"],
-  [/\bd\s?b\s?t\b/gi, "dbt"],
-  [/\b(?:see\s?quel|sequel|s\s?q\s?l)\b/gi, "SQL"],
-  [/\bpost\s?gres(?:s)?(?:\s?(?:sql|sequel|s\s?q\s?l))?\b/gi, "PostgreSQL"],
-  [/\be\s?t\s?l\b/gi, "ETL"],
-  [/\bmap\s?let(?:s)?\b/gi, "mapplet"],
-  [/\bairflow\b/gi, "Airflow"],
-  [/\bpie\s?spark\b/gi, "PySpark"]
-];
+async function streamModel(gen, key, model, systemPrompt, contents, useThinking) {
+  const attempt = new AbortController();
+  const onAbort = () => attempt.abort();
+  gen.controller.signal.addEventListener("abort", onAbort);
+  let timer = setTimeout(() => attempt.abort(), FIRST_TOKEN_TIMEOUT_MS);
 
-function applySpeechFixes(text) {
-  let out = text;
-  for (const [pattern, replacement] of SPEECH_FIXES) {
-    out = out.replace(pattern, replacement);
+  try {
+    const generationConfig = {
+      temperature: 0.2,
+      maxOutputTokens: MAX_OUTPUT_TOKENS
+    };
+    // Gemini 3.x: minimal thinking = fastest first token.
+    if (useThinking) generationConfig.thinkingConfig = { thinkingLevel: "minimal" };
+
+    const url =
+      "https://generativelanguage.googleapis.com/v1beta/models/" +
+      encodeURIComponent(model) +
+      ":streamGenerateContent?alt=sse";
+
+    let response;
+    try {
+      response = await fetch(url, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-goog-api-key": key
+        },
+        body: JSON.stringify({
+          system_instruction: { parts: [{ text: systemPrompt }] },
+          contents,
+          generationConfig
+        }),
+        signal: attempt.signal
+      });
+    } catch (error) {
+      if (gen.cancelled) return { state: "cancelled" };
+      return {
+        state: "next",
+        error: error.name === "AbortError"
+          ? "Timed out waiting for " + model
+          : "Network error: " + error.message
+      };
+    }
+
+    if (!response.ok) {
+      clearTimeout(timer);
+      const err = await response.json().catch(() => ({}));
+      const message = err.error?.message ||
+        ("HTTP " + response.status + " for " + model);
+
+      if (useThinking && response.status === 400 && /think/i.test(message)) {
+        return { state: "no-thinking", error: message };
+      }
+      if ([400, 401, 403].includes(response.status)) {
+        return { state: "fatal", error: message };
+      }
+      return { state: "next", error: message };
+    }
+
+    if (!response.body) {
+      return { state: "next", error: "Streaming is not supported by this browser." };
+    }
+
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = "";
+    let text = "";
+    let blocked = "";
+
+    try {
+      while (true) {
+        let result;
+        try {
+          result = await reader.read();
+        } catch (error) {
+          if (gen.cancelled) return { state: "cancelled" };
+          if (text) return { state: "ok", text };
+          return {
+            state: "next",
+            error: error.name === "AbortError"
+              ? "Timed out waiting for " + model
+              : "Stream interrupted"
+          };
+        }
+
+        buffer += decoder.decode(
+          result.value || new Uint8Array(),
+          { stream: !result.done }
+        );
+
+        const lines = buffer.split(/\r?\n/);
+        buffer = lines.pop() || "";
+
+        for (const line of lines) {
+          const clean = line.trim();
+          if (!clean.startsWith("data:")) continue;
+
+          const payload = clean.slice(5).trim();
+          if (!payload || payload === "[DONE]") continue;
+
+          try {
+            const data = JSON.parse(payload);
+            const parts = data.candidates?.[0]?.content?.parts || [];
+            for (const part of parts) {
+              if (typeof part.text === "string" && !part.thought) text += part.text;
+            }
+            if (data.promptFeedback?.blockReason) {
+              blocked = "Prompt blocked: " + data.promptFeedback.blockReason;
+            }
+          } catch (error) {
+            // Ignore incomplete event data.
+          }
+        }
+
+        if (text) {
+          clearTimeout(timer);
+          const verdict = onStreamText(gen, text);
+          if (verdict === "stop") return { state: "cancelled" };
+          if (verdict === "skip") {
+            gen.skipped = true;
+            attempt.abort();
+            return { state: "skipped" };
+          }
+        }
+
+        if (result.done) break;
+      }
+    } finally {
+      try { reader.releaseLock(); } catch (error) {}
+    }
+
+    if (text.trim()) return { state: "ok", text };
+    return { state: "next", error: blocked || "The model returned an empty response." };
+  } finally {
+    clearTimeout(timer);
+    gen.controller.signal.removeEventListener("abort", onAbort);
   }
-  return normalizeText(out);
 }
 
-// These phrases usually mean the speaker has not finished the question.
-function isIncompleteQuestion(text) {
-  const q = normalizeText(text)
-    .toLowerCase()
-    .replace(/[.!?]+$/, "")
-    .trim();
+async function dispatchAI(question, heardPlain) {
+  const key = getApiKey();
 
-  const incompletePatterns = [
-    /^what is$/,
-    /^what are$/,
-    /^what was$/,
-    /^what were$/,
-    /^what do$/,
-    /^what does$/,
-    /^what did$/,
-    /^what will$/,
-    /^what would$/,
-    /^what can$/,
-    /^what should$/,
-    /^what about$/,
-    /^why is$/,
-    /^why are$/,
-    /^why do$/,
-    /^why does$/,
-    /^how is$/,
-    /^how are$/,
-    /^how do$/,
-    /^how does$/,
-    /^how did$/,
-    /^how can$/,
-    /^how to$/,
-    /^when is$/,
-    /^when do$/,
-    /^when does$/,
-    /^where is$/,
-    /^where are$/,
-    /^who is$/,
-    /^which is$/,
-    /^difference between$/,
-    /^explain$/,
-    /^define$/,
-    /^tell me about$/,
-    /^can you explain$/,
-    /^could you explain$/,
-    /^please explain$/
-  ];
+  if (!key) {
+    setStatus("INVALID KEY", "red");
+    setLive("Check your Gemini API key.");
+    return;
+  }
 
-  return incompletePatterns.some(pattern => pattern.test(q));
+  const now = Date.now();
+  if (question === lastQuestion && now - lastQuestionAt < 4000) {
+    discardSpeech();
+    return;
+  }
+  lastQuestion = question;
+  lastQuestionAt = now;
+
+  const gen = {
+    id: ++genCounter,
+    raw: heardPlain,
+    question,
+    controller: new AbortController(),
+    committed: false,
+    cancelled: false,
+    skipped: false,
+    startedAt: performance.now(),
+    firstTokenAt: 0,
+    card: null
+  };
+  activeGen = gen;
+
+  setStatus("THINKING", "orange");
+  setLive("Question captured. Generating answer...");
+
+  const systemPrompt = buildSystemPrompt();
+  const contents = buildContents(question);
+
+  let outcome = "failed";
+  let answer = "";
+  let lastError = "No response received.";
+
+  search:
+  for (const model of MODELS) {
+    for (const useThinking of [true, false]) {
+      const r = await streamModel(gen, key, model, systemPrompt, contents, useThinking);
+
+      if (r.state === "cancelled") return;
+      if (r.state === "skipped") { outcome = "skipped"; break search; }
+      if (r.state === "ok") { outcome = "ok"; answer = r.text; break search; }
+
+      lastError = r.error || lastError;
+      if (r.state === "no-thinking") continue;   // same model, no thinkingConfig
+      if (r.state === "fatal") break search;
+      break;                                      // try the next model
+    }
+  }
+
+  if (gen.cancelled) return;
+
+  if (outcome === "skipped") {
+    finishGeneration(gen);
+    setLive("Ignored: the model decided that was not a question.");
+    return;
+  }
+
+  if (!gen.committed) commitGeneration(gen);
+
+  if (outcome === "ok") {
+    gen.card.answer.textContent = cleanAnswer(answer);
+    rememberAnswer(answer);
+    history.push({ q: question, a: answer });
+    if (history.length > HISTORY_TURNS) history.shift();
+    setStatus("ANSWER READY", "green");
+  } else {
+    gen.card.answer.textContent =
+      "Request failed: " + lastError +
+      "\nCheck API key, model availability, quota and internet.";
+    setStatus("REQUEST FAILED", "red");
+  }
+
+  finishGeneration(gen);
 }
 
+/* =========================================================================
+   SPEECH ENGINE 1: browser Web Speech API (free)
+   ========================================================================= */
+function createBrowserEngine() {
+  const SpeechAPI = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!SpeechAPI) {
+    throw new Error("Speech recognition is unavailable here. Use Chrome, or switch to Deepgram.");
+  }
+
+  const rec = new SpeechAPI();
+  rec.continuous = true;
+  rec.interimResults = true;
+  rec.lang = "en-IN";
+  rec.maxAlternatives = 1;
+
+  let committed = "";   // text kept across recognition restarts
+  let lastText = "";
+  let sessionStart = 0; // results before this index were already used
+  let lastLen = 0;
+
+  rec.onstart = () => {
+    sessionStart = 0;
+    lastLen = 0;
+    if (isListening && !activeGen) setStatus("LISTENING", "green");
+  };
+
+  rec.onresult = event => {
+    lastLen = event.results.length;
+    if (sessionStart > lastLen) sessionStart = 0;
+
+    const transcript = buildTranscript(event.results, sessionStart);
+    lastText = normalizeText(committed + " " + transcript);
+    heard(lastText, false);
+  };
+
+  rec.onerror = event => {
+    if (event.error === "not-allowed" || event.error === "service-not-allowed") {
+      fatalStop("Microphone permission denied. Allow it in browser settings.", "MIC DENIED");
+      return;
+    }
+
+    if (event.error === "network") {
+      setLive(
+        "Speech recognition network error. Check internet access. " +
+        "The browser speech service may be temporarily unavailable."
+      );
+    } else if (event.error !== "no-speech" && event.error !== "aborted") {
+      setLive("Microphone error: " + event.error);
+    }
+  };
+
+  rec.onend = () => {
+    committed = lastText;
+    sessionStart = 0;
+    lastLen = 0;
+
+    if (!isListening) return;
+
+    setTimeout(() => {
+      if (!isListening) return;
+      try { rec.start(); } catch (error) {}
+    }, 300);
+  };
+
+  return {
+    name: "browser",
+    async start() { rec.start(); },
+    stop() { try { rec.stop(); } catch (error) {} },
+    consume() {
+      committed = "";
+      lastText = "";
+      sessionStart = lastLen;
+    }
+  };
+}
+
+/* =========================================================================
+   SPEECH ENGINE 2: Deepgram streaming (fast, can hear the interviewer's
+   tab / system audio, recognises your technical terms via keyterm prompting)
+   ========================================================================= */
+function createDeepgramEngine() {
+  const dgKey = $("dgKey").value.trim();
+  if (!dgKey) throw new Error("Paste your Deepgram API key first.");
+  if (!window.MediaRecorder) throw new Error("This browser does not support MediaRecorder.");
+
+  let ws = null;
+  let stream = null;
+  let audioStream = null;
+  let recorder = null;
+  let keepAlive = null;
+  let stopped = false;
+  let everOpened = false;
+  let retries = 0;
+  let lang = "en-IN";
+  let finalText = "";
+  let interim = "";
+
+  function keyterms() {
+    const extra = $("keyterms").value
+      .split(",")
+      .map(s => s.trim())
+      .filter(Boolean);
+    return [...DEFAULT_KEYTERMS, ...extra].slice(0, 60);
+  }
+
+  function startRecorder() {
+    try {
+      if (recorder && recorder.state !== "inactive") recorder.stop();
+    } catch (error) {}
+
+    const mime = MediaRecorder.isTypeSupported("audio/webm;codecs=opus")
+      ? "audio/webm;codecs=opus"
+      : "audio/webm";
+
+    recorder = new MediaRecorder(audioStream, { mimeType: mime });
+    recorder.ondataavailable = event => {
+      if (event.data.size > 0 && ws && ws.readyState === 1) ws.send(event.data);
+    };
+    recorder.start(250);   // a new chunk every 250 ms
+  }
+
+  function openSocket() {
+    const params = new URLSearchParams({
+      model: "nova-3",
+      language: lang,
+      interim_results: "true",
+      endpointing: "300",
+      utterance_end_ms: "1000",
+      smart_format: "true",
+      punctuate: "true"
+    });
+    for (const term of keyterms()) params.append("keyterm", term);
+
+    ws = new WebSocket("wss://api.deepgram.com/v1/listen?" + params.toString(), ["token", dgKey]);
+
+    ws.onopen = () => {
+      everOpened = true;
+      retries = 0;
+      setLive("Deepgram connected. Listening...");
+      startRecorder();
+      clearInterval(keepAlive);
+      keepAlive = setInterval(() => {
+        if (ws && ws.readyState === 1) ws.send(JSON.stringify({ type: "KeepAlive" }));
+      }, 8000);
+    };
+
+    ws.onmessage = event => {
+      let msg;
+      try { msg = JSON.parse(event.data); } catch (error) { return; }
+
+      if (msg.type === "Results") {
+        const transcript = (msg.channel?.alternatives?.[0]?.transcript || "").trim();
+
+        if (msg.is_final) {
+          if (transcript) finalText = normalizeText(finalText + " " + transcript);
+          interim = "";
+        } else {
+          interim = transcript;
+        }
+
+        const text = normalizeText(finalText + " " + interim);
+        if (text) heard(text, !!(msg.is_final && msg.speech_final));
+      } else if (msg.type === "UtteranceEnd") {
+        if (pendingSpeech && !activeGen) scheduleSubmission(true);
+      } else if (msg.type === "Error") {
+        setLive("Deepgram error: " + (msg.description || msg.message || "unknown"));
+      }
+    };
+
+    ws.onclose = event => {
+      clearInterval(keepAlive);
+      if (stopped) return;
+
+      if (!everOpened && lang !== "en") {
+        lang = "en";     // en-IN may be rejected; fall back to generic English
+        openSocket();
+        return;
+      }
+      if (!everOpened) {
+        fatalStop("Could not connect to Deepgram (code " + event.code + "). Check the Deepgram key.", "MIC ERROR");
+        return;
+      }
+      if (retries++ < 5) {
+        setLive("Deepgram connection lost. Reconnecting...");
+        setTimeout(() => { if (!stopped) openSocket(); }, 800);
+      } else {
+        fatalStop("Deepgram connection lost.", "MIC ERROR");
+      }
+    };
+  }
+
+  return {
+    name: "deepgram",
+
+    async start() {
+      stopped = false;
+
+      if ($("audioSource").value === "tab") {
+        stream = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: true });
+        if (!stream.getAudioTracks().length) {
+          stream.getTracks().forEach(t => t.stop());
+          throw new Error(
+            "No audio was shared. Pick a Chrome tab and tick 'Share tab audio' " +
+            "(or share the entire screen with system audio on Windows)."
+          );
+        }
+        stream.getAudioTracks()[0].addEventListener("ended", () => {
+          if (!stopped) fatalStop("Shared audio ended. Press Start Mic and share again.", "MIC ERROR");
+        });
+      } else {
+        stream = await navigator.mediaDevices.getUserMedia({
+          audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true }
+        });
+      }
+
+      audioStream = new MediaStream(stream.getAudioTracks());
+      openSocket();
+    },
+
+    stop() {
+      stopped = true;
+      clearInterval(keepAlive);
+      try { if (recorder && recorder.state !== "inactive") recorder.stop(); } catch (error) {}
+      try {
+        if (ws && ws.readyState === 1) ws.send(JSON.stringify({ type: "CloseStream" }));
+        if (ws) ws.close();
+      } catch (error) {}
+      if (stream) stream.getTracks().forEach(t => t.stop());
+    },
+
+    consume() {
+      finalText = "";
+      interim = "";
+    }
+  };
+}
+
+/* =========================================================================
+   CONTROLS
+   ========================================================================= */
 function updateMicButton() {
   const btn = $("listenBtn");
   btn.textContent = isListening ? "Stop Mic" : "Start Mic";
@@ -538,171 +1259,50 @@ function updateLockButton() {
 
 async function keepAwake() {
   try {
-    if ("wakeLock" in navigator) {
-      wakeLock = await navigator.wakeLock.request("screen");
-    }
+    if ("wakeLock" in navigator) wakeLock = await navigator.wakeLock.request("screen");
   } catch (error) {
     // Optional browser feature.
   }
 }
 
-function initSpeech() {
-  const SpeechAPI =
-    window.SpeechRecognition ||
-    window.webkitSpeechRecognition;
-
-  if (!SpeechAPI) {
-    alert("Speech recognition is unavailable. Try Chrome.");
-    return null;
-  }
-
-  const rec = new SpeechAPI();
-  rec.continuous = true;
-  rec.interimResults = true;
-  rec.lang = "en-IN";
-  rec.maxAlternatives = 1;
-
-  // A fresh session started: clear any stale "MIC DENIED"/error badge.
-  rec.onstart = () => {
-    sessionStart = 0;
-    lastResultsLen = 0;
-    if (isListening && !isProcessing) setStatus("LISTENING", "green");
-  };
-
-  rec.onresult = event => {
-    lastResultsLen = event.results.length;
-
-    // Ignore anything heard while blocked or while an answer is generating,
-    // and make sure it is not picked up later.
-    if (isLocked || isProcessing) {
-      sessionStart = event.results.length;
-      return;
-    }
-
-    if (sessionStart > event.results.length) sessionStart = 0;
-
-    const transcript = buildTranscript(event.results, sessionStart);
-    pendingSpeech = normalizeText(committedSpeech + " " + transcript);
-
-    if (!pendingSpeech) return;
-
-    setLive("Hearing: " + applySpeechFixes(pendingSpeech));
-
-    // Restart the countdown on every result (interim or final), so we
-    // only submit after the speaker has really paused.
-    scheduleQuestionSubmission();
-  };
-
-  rec.onerror = event => {
-    if (event.error === "not-allowed" ||
-        event.error === "service-not-allowed") {
-      isListening = false;
-      updateMicButton();
-      setStatus("MIC DENIED", "red");
-      setLive("Microphone permission denied. Allow it in browser settings.");
-      return;
-    }
-
-    if (event.error === "network") {
-      setLive(
-        "Speech recognition network error. Check internet access. " +
-        "The browser speech service may be temporarily unavailable."
-      );
-    } else if (event.error !== "no-speech" &&
-               event.error !== "aborted") {
-      setLive("Microphone error: " + event.error);
-    }
-  };
-
-  rec.onend = () => {
-    // Keep what was heard so far; the next session starts with an
-    // empty results list.
-    committedSpeech = pendingSpeech;
-    sessionStart = 0;
-    lastResultsLen = 0;
-
-    if (!isListening) return;
-
-    setTimeout(() => {
-      if (!isListening) return;
-
-      try {
-        rec.start();
-      } catch (error) {
-        // Ignore a start request if recognition is already active.
-      }
-    }, 300);
-  };
-
-  return rec;
+// Keeps the TLS connection to the Gemini API warm so the first request of an
+// answer does not pay for a new handshake.
+function warmUp() {
+  const key = getApiKey();
+  if (!key) return;
+  fetch(
+    "https://generativelanguage.googleapis.com/v1beta/models/" +
+      encodeURIComponent(MODELS[0]) + "?key=" + encodeURIComponent(key),
+    { method: "GET" }
+  ).catch(() => {});
 }
 
-function scheduleQuestionSubmission() {
+function fatalStop(message, badge) {
+  isListening = false;
   clearTimeout(speechTimer);
-
-  speechTimer = setTimeout(() => {
-    submitCompletedSpeech();
-  }, SPEECH_PAUSE_MS);
-}
-
-async function submitCompletedSpeech() {
-  let question = applySpeechFixes(pendingSpeech);
-
-  if (!question || isLocked || isProcessing) return;
-
-  // Drop speech that is just you reading an answer from the screen.
-  if ($("echoFilter").checked) {
-    const echo = filterEcho(question);
-
-    if (echo.removed > 0) {
-      if (!echo.text) {
-        markSpeechConsumed();
-        setLive("Ignored: this sounded like you reading the last answer.");
-        return;
-      }
-      question = echo.text;
-    }
-  }
-
-  // Do not submit incomplete starters such as "what is".
-  if (isIncompleteQuestion(question)) {
-    setLive(
-      'I heard "' + question +
-      '". Please continue your question; I am waiting.'
-    );
-    return;
-  }
-
-  // Ignore fragments that are too short to be useful.
-  if (question.length < 5) {
-    setLive("Waiting for more speech...");
-    return;
-  }
-
-  // Mark everything heard so far as used, so it is never re-submitted.
-  pendingSpeech = "";
-  committedSpeech = "";
-  sessionStart = lastResultsLen;
-  clearTimeout(speechTimer);
-
-  await dispatchAI(question);
+  clearTimeout(staleTimer);
+  clearInterval(warmTimer);
+  if (engine) engine.stop();
+  updateMicButton();
+  setStatus(badge || "MIC ERROR", "red");
+  setLive(message);
 }
 
 async function toggleListening() {
   if (isListening) {
     isListening = false;
     clearTimeout(speechTimer);
-
-    if (recognition) {
-      try { recognition.stop(); } catch (error) {}
-    }
+    clearTimeout(staleTimer);
+    clearInterval(warmTimer);
+    cancelGeneration();
+    if (engine) engine.stop();
 
     if (wakeLock) {
       try { await wakeLock.release(); } catch (error) {}
       wakeLock = null;
     }
 
-    resetSpeechState();
+    pendingSpeech = "";
     updateMicButton();
     setStatus("STANDBY");
     setLive("Microphone stopped.");
@@ -720,23 +1320,30 @@ async function toggleListening() {
     return;
   }
 
-  if (!recognition) recognition = initSpeech();
-  if (!recognition) return;
-
   try {
-    resetSpeechState();
-    sessionStart = 0;
-    lastResultsLen = 0;
-    recognition.start();
+    engine = $("engine").value === "deepgram"
+      ? createDeepgramEngine()
+      : createBrowserEngine();
+    pendingSpeech = "";
     isListening = true;
-    updateMicButton();
-    setStatus("LISTENING", "green");
-    setLive("Listening. Speak your full question naturally.");
-    await keepAwake();
+    await engine.start();
   } catch (error) {
+    isListening = false;
+    if (engine) engine.stop();
+    updateMicButton();
     setStatus("MIC ERROR", "red");
-    setLive("Could not start microphone. Tap Start Mic again.");
+    setLive(error.message || "Could not start the microphone.");
+    return;
   }
+
+  updateMicButton();
+  setStatus("LISTENING", "green");
+  setLive("Listening. Speak your full question naturally.");
+  await keepAwake();
+
+  warmUp();
+  clearInterval(warmTimer);
+  warmTimer = setInterval(warmUp, 45000);
 }
 
 function toggleLock() {
@@ -745,12 +1352,12 @@ function toggleLock() {
 
   if (isLocked) {
     clearTimeout(speechTimer);
+    cancelGeneration();
     pendingSpeech = "";
-    committedSpeech = "";
-    sessionStart = lastResultsLen;
+    if (engine) engine.consume();
     setLive("Speech blocked. Tap Speech Blocked to resume.");
   } else {
-    sessionStart = lastResultsLen;
+    if (engine) engine.consume();
     setLive("Speech resumed. Ask your complete question.");
   }
 }
@@ -759,219 +1366,43 @@ function clearFeed() {
   $("feed").replaceChildren();
   recentAnswers = [];
   answerBigrams = new Set();
+  history = [];
   lastQuestion = "";
-  resetSpeechState();
-  setLive("Feed cleared. Ready for the next question.");
+  discardSpeech("Feed cleared. Ready for the next question.");
 }
 
-async function dispatchAI(question) {
-  if (isProcessing) {
-    // Preserve the question rather than silently losing it.
-    pendingSpeech = normalizeText(
-      pendingSpeech + " " + question
-    );
-    setLive("Question queued. Waiting for the current answer.");
-    return;
+/* =========================================================================
+   SETTINGS (saved in this browser; API keys are never saved)
+   ========================================================================= */
+function syncEngineUI() {
+  const dg = $("engine").value === "deepgram";
+  $("dgKey").style.display = dg ? "block" : "none";
+  $("audioWrap").style.display = dg ? "block" : "none";
+}
+
+function initSettings() {
+  const fields = ["engine", "audioSource", "style", "keyterms", "context"];
+  for (const id of fields) {
+    const saved = load(id);
+    if (saved !== null) $(id).value = saved;
+    $(id).addEventListener("input", () => { store(id, $(id).value); syncEngineUI(); });
+    $(id).addEventListener("change", () => { store(id, $(id).value); syncEngineUI(); });
   }
 
-  const key = getApiKey();
-
-  if (!key) {
-    setStatus("INVALID KEY", "red");
-    setLive("Check your Gemini API key.");
-    return;
+  for (const id of ["simpleLang", "echoFilter"]) {
+    const saved = load(id);
+    if (saved !== null) $(id).checked = saved === "1";
+    $(id).addEventListener("change", () => store(id, $(id).checked ? "1" : "0"));
   }
 
-  const now = Date.now();
-
-  if (question === lastQuestion && now - lastQuestionAt < 4000) {
-    return;
-  }
-
-  lastQuestion = question;
-  lastQuestionAt = now;
-
-  isProcessing = true;
-  setStatus("THINKING", "orange");
-  setLive("Question captured. Generating answer...");
-
-  const output = createCard(question);
-
-  let succeeded = false;
-  let lastError = "No response received.";
-
-  const systemPrompt = `
-You are a concise technical interview assistant for ETL and Data Engineering.
-
-Topics: Informatica PowerCenter, SQL, PostgreSQL, Redshift,
-Snowflake, dbt, AWS, ETL and data warehousing.
-
-The question comes from speech-to-text and may contain mishearings of
-technical terms (for example "information of our centre" means
-"Informatica PowerCenter", "red shift" means "Redshift"). Silently
-interpret it as the most likely data-engineering question.
-
-Rules:
-- SQL questions: output executable SQL first, then up to 2 short notes.
-- Conceptual questions: give a direct definition and 3 concise bullets.
-- Keep answers under 60 words unless code needs more.
-- Be technically accurate and specific.
-- Plain text only: no markdown, no ** or # characters. Use "-" for bullets.
-- No greetings, introductions or filler.
-- Answer the actual question, not an assumed unrelated question.
-`;
-
-  // A fallback is attempted if the first model is unavailable.
-  const models = [
-    "gemini-3.5-flash-lite",
-    "gemini-3.8-flash"
-  ];
-
-  try {
-    for (const model of models) {
-      let response;
-
-      try {
-        const url =
-          "https://generativelanguage.googleapis.com/v1beta/models/" +
-          encodeURIComponent(model) +
-          ":streamGenerateContent?alt=sse";
-
-        response = await fetch(url, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "x-goog-api-key": key
-          },
-          body: JSON.stringify({
-            system_instruction: {
-              parts: [{ text: systemPrompt }]
-            },
-            contents: [{
-              role: "user",
-              parts: [{ text: question }]
-            }],
-            generationConfig: {
-              temperature: 0.1,
-              maxOutputTokens: 180
-            }
-          })
-        });
-      } catch (error) {
-        lastError = "Network error: " + error.message;
-        continue;
-      }
-
-      if (!response.ok) {
-        const err = await response.json().catch(() => ({}));
-        lastError = err.error?.message ||
-          ("HTTP " + response.status + " for " + model);
-
-        if ([400, 401, 403].includes(response.status)) break;
-        continue;
-      }
-
-      if (!response.body) {
-        lastError = "Streaming is not supported by this browser.";
-        continue;
-      }
-
-      let answer = "";
-      let buffer = "";
-      const reader = response.body.getReader();
-      const decoder = new TextDecoder();
-
-      try {
-        while (true) {
-          const result = await reader.read();
-
-          buffer += decoder.decode(
-            result.value || new Uint8Array(),
-            { stream: !result.done }
-          );
-
-          const lines = buffer.split(/\r?\n/);
-          buffer = lines.pop() || "";
-
-          for (const line of lines) {
-            const clean = line.trim();
-            if (!clean.startsWith("data:")) continue;
-
-            const payload = clean.slice(5).trim();
-            if (!payload || payload === "[DONE]") continue;
-
-            try {
-              const data = JSON.parse(payload);
-              const parts =
-                data.candidates?.[0]?.content?.parts || [];
-
-              for (const part of parts) {
-                if (typeof part.text === "string") {
-                  answer += part.text;
-                }
-              }
-
-              if (answer) output.textContent = answer;
-
-              const reason = data.promptFeedback?.blockReason;
-              if (reason) lastError = "Prompt blocked: " + reason;
-            } catch (error) {
-              // Ignore incomplete event data.
-            }
-          }
-
-          if (result.done) break;
-        }
-      } finally {
-        reader.releaseLock();
-      }
-
-      if (!answer.trim()) {
-        lastError = lastError === "No response received."
-          ? "The model returned an empty response."
-          : lastError;
-        continue;
-      }
-
-      succeeded = true;
-      break;
-    }
-
-    if (!succeeded) {
-      output.textContent =
-        "Request failed: " + lastError +
-        "\nCheck API key, model availability, quota and internet.";
-      setStatus("REQUEST FAILED", "red");
-    } else {
-      rememberAnswer(output.textContent);
-      setStatus("ANSWER READY", "green");
-    }
-  } catch (error) {
-    output.textContent = "Error: " +
-      (error.message || String(error));
-    setStatus("ERROR", "red");
-  } finally {
-    isProcessing = false;
-
-    // Anything said while the answer was generating is discarded.
-    pendingSpeech = "";
-    committedSpeech = "";
-    sessionStart = lastResultsLen;
-
-    if (isListening) {
-      setStatus("LISTENING", "green");
-      setLive("Ready for the next complete question.");
-    } else if (succeeded) {
-      setStatus("STANDBY");
-    }
-  }
+  syncEngineUI();
 }
 
 document.addEventListener("visibilitychange", async () => {
-  if (document.visibilityState === "visible" && isListening) {
-    await keepAwake();
-  }
+  if (document.visibilityState === "visible" && isListening) await keepAwake();
 });
+
+initSettings();
 </script>
 </body>
 </html>
